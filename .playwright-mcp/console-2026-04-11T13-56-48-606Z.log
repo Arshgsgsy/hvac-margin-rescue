@@ -1,0 +1,102 @@
+[     979ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://v0.app/api/git/connection?chatId=tYNkLtv9KOc:0
+[    1121ms] Error: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at rK (https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:421734)
+    at rZ (https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:423102)
+    at https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:517128
+    at sh (https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:522295)
+    at sf (https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:513545)
+    at https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:508370
+    at se (https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:508471)
+    at sV (https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:535047)
+    at MessagePort.z (https://v0.app/chat-static/_next/static/chunks/2e7s32resl_hp.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:1:1648)
+[    1263ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://v0.app/api/chat/chat/latest?chatId=tYNkLtv9KOc&lastSyncedAt=1775915500153:0
+[    1290ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://v0.app/chat/api/snapshots/latest?chatId=tYNkLtv9KOc&blockId=b_kESf4AvuI2Y:0
+[    2154ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://v0.app/chat/api/vm/actions?cid=tYNkLtv9KOc&bid=b_kESf4AvuI2Y&type=sync_preview_to_block&syncAttemptId=149fb974-2103-45bf-9f38-d4b5fbdcfa91:0
+[    2194ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ https://v0.app/chat-static/_next/static/chunks/0m0ihwrb7ojps.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:4
+[    6050ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://v0.app/api/git/connection?chatId=tYNkLtv9KOc:0
+[    9956ms] [WARNING] Error accessing popup window location, may be cross-origin: SecurityError: Failed to read a named property 'pathname' from 'Location': Blocked a frame with origin "https://v0.app" from accessing a cross-origin frame.
+    at https://v0.app/chat-static/_next/static/chunks/1p847de9_f2vm.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:53:96966
+    at n (https://v0.app/chat-static/_next/static/chunks/0m0ihwrb7ojps.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:2:4689) @ https://v0.app/chat-static/_next/static/chunks/0m0ihwrb7ojps.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:4
+[   16095ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://v0.app/api/git/connection?chatId=tYNkLtv9KOc:0
+[   30968ms] [LOG] %c
+▲
+
+  ________            ___    ____   ________                __
+ /_  __/ /_  ___     /   |  /  _/  / ____/ /___  __  ______/ /
+  / / / __ \/ _ \   / /| |  / /   / /   / / __ \/ / / / __  /
+ / / / / / /  __/  / ___ |_/ /   / /___/ / /_/ / /_/ / /_/ /
+/_/ /_/ /_/\___/  /_/  |_/___/   \____/_/\____/\__,_/\__,_/
+  
+
+Hello!
+
+- Open Source https://vercel.com/oss
+- Careers https://vercel.com/careers
+- Status https://vercel-status.com
+
+ font-family: "Geist Mono", monospace; white-space: pre; line-height: 1; @ https://vercel.com/_next/static/chunks/3vt9z9-00w7jo.js?dpl=dpl_8dq4wa4JiKbhrvU44kJJ1S2VD7do:72
+[   31392ms] [WARNING] [GSI_LOGGER]: Your client application uses one of the Google One Tap prompt UI status methods that may stop functioning when FedCM becomes mandatory. Refer to the migration guide to update your code accordingly and opt-in to FedCM to test your changes. Learn more: https://developers.google.com/identity/gsi/web/guides/fedcm-migration?s=dc#display_moment and https://developers.google.com/identity/gsi/web/guides/fedcm-migration?s=dc#skipped_moment @ https://accounts.google.com/gsi/client:84
+[   31400ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://vercel.com/api/jwt:0
+[   31405ms] [ERROR] Not signed in with the identity provider. @ https://vercel.com/login/v0?next=%2Fapi%2Fvercel-auth%3FredirectUrl%3Dhttps%253A%252F%252Fv0.app%252Fapi%252Fauth%252Fcallback%26qs%3D%26clientId%3Dv0%26state%3DKkQQfK2DAXgB8-GOtBa6bfwjRZ1kqxTsDRWnIl_R5Vn%26utm_medium%3Dreferral%26utm_campaign%3Dinvite_and_earn%26utm_source%3Dqc113434-6042:0
+[   31480ms] [WARNING] Deprecated API for given entry type. @ https://vercel.com/_next/static/chunks/0835ycci1b4sv.js?dpl=dpl_8dq4wa4JiKbhrvU44kJJ1S2VD7do:18
+[   32310ms] [ERROR] [GSI_LOGGER]: FedCM get() rejects with NetworkError: Error retrieving a token. @ https://vercel.com/_next/static/chunks/1rf-lt0wigv52.js?dpl=dpl_8dq4wa4JiKbhrvU44kJJ1S2VD7do:2
+[   32509ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://o205439.ingest.sentry.io/api/1323670/envelope/?sentry_key=d00780d432ac4ccf882f60dd02062e14&sentry_version=7&sentry_client=sentry.javascript.browser%2F7.111.0:0
+[   33969ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://accounts.google.com/v3/signin/identifier?opparams=%253F&dsh=S-1036516276%3A1775915842221555&client_id=258013614557-nema0dumfbottebi6to7aqi85qot9pvs.apps.googleusercontent.com&o2v=2&redirect_uri=https%3A%2F%2Fvercel.com%2Fapi%2Fregistration%2Fgoogle%2Fcallback&response_type=code&scope=openid+profile+email&service=lso&state=7071ed8b08ced5f4b8f96e4a5c0cb494f8c2b2c8f5f50d3e463a4e3d275e8a5eb503ab0069bff9a196c32ce3e7ae48b2a656c1c0ceff57cc8f4487f6a11f27f3a35f961c42a8846d1393481ad1771c573501df17db31e48a92b27d37c437e1bbb1a9ebfe73e299c8319866a6e26f696a45bf2d14d301827cc19d8d9577eb7a34791d20f835bf830773b82d0a414d513f55d92811b64c48f459f239492fc87df982a38490534207f48b8c92b7752f83245099cee76d6f4fb757edb4924a23db4ef24c52e4a53ec18070e2712b630c4ba295f768740cebecb8bc7147b1e4374bf8dd85e52c20372c9330bf6d8731adb8d3a07cf60fd5970f970b4b8ab535c99c5b868de7a7f72de6d628c76abde48e76300680d70b7b9efe5abb98ca0aee7ec23c38e23c78b2aa789f55f1d07fc344c9048898de2e5a9105c229181dadfa8c607422755387a96d9b29479262ecce4e1b3876c0ea279d7bc416ba443583c3a60f081b38a9493fda4e5bd0cd5fac8f363b425bf54effa1e414d37f6c86cc066eed830e95c077ee39b92c133b388e630a5996cf333c1052336c9dde891b1482181397e97c8854155b2ce43c97cf40223340a83cf89f1955edc4043c745b0564fb50ae5c2024681e09ff3a70886229bee2b82657946b52e7c9c9de17c4b445318c38fce45c5a23d2789e9706ecbfbff9950f5fa82e220937f0af04c44daed70c330f0efb37f99f69d5e356348fc35f9c2172160744d9f120683de187e73f496a4ab47b7e72fb6b33464480c41ee2824b5ded8017335202463b6ab9b6e3e991ddf0078a4ee447c62de1&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAMZ9OSYSW0mN5gYomSKNq0LYGRNMOXuNwcQLd24ikSNdnRGx70c2V1t1HNBnMwJTqT7Fo83aS9EMvPabmpU70jI9uVQ2qKjRGaGYP-r27H-mXOavVLg5zROaHOCNTYwi-CyDNTLuuDwmYB2UCWjP3371Jclt1oU-3HN0oPw2V2olMsAi34vQqaaZYDVXNlxfPaToiLzSJoebfQHIu5mw0h77HtzjDxDNQylZJe1YbgXr0rCGfTI-5TlMWcPRwpm6Xq6kdZB2GDjC0nJwiGJQrZX00Ig5M9Z0541bD5eRGoy0ZRZvqWEAaXRK8m_9rcNcyMAn1xTACfLMGwZsqNjUBcMeiBXSz5F5Ujk18iNU27JekOoHXydegaciQeSz29itJihC10FEJv7rytttcY70k6466W26Xy85xi2peqH-yHw7y02os8OqBZaONToconBK5GekibyHIowPN5puuZeQ3hfznhqpg%26flowName%3DGeneralOAuthFlow%26as%3DS-1036516276%253A1775915842221555%26client_id%3D258013614557-nema0dumfbottebi6to7aqi85qot9pvs.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Fvercel.com&rart=ANgoxcfwqX5642n6NCQvo-SJUj4ikiWe0gjcbwg4KJI8qLrPXnlsKImkopw-A4-NMa9klRhnxwSb6YbRqyBqtjcF61MKAXReJvA0_Fuis2NXnityIx8Y5eE:0
+[   33975ms] [LOG] %c%s color: red; background: yellow; font-size: 24px; WARNING! @ https://www.gstatic.com/_/mss/boq-identity/_/js/k=boq-identity.AccountsSignInUi.en_US.llpEXSAT6Ik.es5.O/am=Kf4GAABCEUgGwP__HzIAIACCaOB6FoAmEBkAAAAAAAAAALBAAAAaAQ/d=1/excm=_b,_tp,identifierview/ed=1/dg=0/wt=2/ujg=1/rs=AOaEmlGvB4qNo995bvFQSxSsvxho_seXjg/dti=1/m=_b,_tp:468
+[   33975ms] [LOG] %c%s font-size: 18px; Using this console may allow attackers to impersonate you and steal your information using an attack called Self-XSS.
+Do not enter or paste code that you do not understand. @ https://www.gstatic.com/_/mss/boq-identity/_/js/k=boq-identity.AccountsSignInUi.en_US.llpEXSAT6Ik.es5.O/am=Kf4GAABCEUgGwP__HzIAIACCaOB6FoAmEBkAAAAAAAAAALBAAAAaAQ/d=1/excm=_b,_tp,identifierview/ed=1/dg=0/wt=2/ujg=1/rs=AOaEmlGvB4qNo995bvFQSxSsvxho_seXjg/dti=1/m=_b,_tp:468
+[   69060ms] [LOG] %c
+▲
+
+  ________            ___    ____   ________                __
+ /_  __/ /_  ___     /   |  /  _/  / ____/ /___  __  ______/ /
+  / / / __ \/ _ \   / /| |  / /   / /   / / __ \/ / / / __  /
+ / / / / / /  __/  / ___ |_/ /   / /___/ / /_/ / /_/ / /_/ /
+/_/ /_/ /_/\___/  /_/  |_/___/   \____/_/\____/\__,_/\__,_/
+  
+
+Hello!
+
+- Open Source https://vercel.com/oss
+- Careers https://vercel.com/careers
+- Status https://vercel-status.com
+
+ font-family: "Geist Mono", monospace; white-space: pre; line-height: 1; @ https://vercel.com/_next/static/chunks/0_q5942vh4opf.js?dpl=dpl_8dq4wa4JiKbhrvU44kJJ1S2VD7do:72
+[   69238ms] [WARNING] Deprecated API for given entry type. @ https://vercel.com/_next/static/chunks/3tis6bcdp-j00.js?dpl=dpl_8dq4wa4JiKbhrvU44kJJ1S2VD7do:18
+[   69356ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://vercel.com/api/jwt:0
+[   75003ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://v0.app/chat/api/snapshots/latest?chatId=tYNkLtv9KOc&blockId=b_kESf4AvuI2Y:0
+[   75195ms] [LOG] [ws-console] Connecting to: wss://sb-788r55p7z7wg.vercel.run  @ https://v0.app/chat-static/_next/static/chunks/0m0ihwrb7ojps.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:4
+[   75355ms] [LOG] [ws-console] WebSocket connected @ https://v0.app/chat-static/_next/static/chunks/0m0ihwrb7ojps.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:4
+[   75853ms] [LOG] [SnapshotRenderer] iframe load event - assuming ready @ https://v0.app/chat-static/_next/static/chunks/0m0ihwrb7ojps.js?dpl=dpl_9JNJynUFG1uRC5kJdociwQeCKitk:4
+[   77941ms] [LOG] %c INFO color: #33f Resolving connection token (sb-qw50k4ydwuq5.vercel.run)... @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   77943ms] [LOG] %c INFO color: #33f Resolved connection token (sb-qw50k4ydwuq5.vercel.run) after 21 ms @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   77948ms] [LOG] %c INFO color: #33f Creating a socket (renderer-Management-d84ee941-9d46-40ca-a67c-9589044917f5)... @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   78026ms] [LOG] %c INFO color: #33f Creating a socket (renderer-Management-d84ee941-9d46-40ca-a67c-9589044917f5) was successful after 78 ms. @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   78076ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/node_modules/vsda/rust/web/vsda_bg.wasm:0
+[   78077ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/node_modules/vsda/rust/web/vsda.js:0
+[   78177ms] [LOG] %c INFO color: #33f [reconnection-grace-time] Client received grace time from server: 10800000ms (10800s) @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   78493ms] [WARNING] The web worker extension host is started in a same-origin iframe! @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:3541
+[   78495ms] [LOG] %c INFO color: #33f Updating additional builtin extensions cache @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   78495ms] [LOG] %c INFO color: #33f Creating a socket (renderer-ExtensionHost-a2471799-99aa-499f-ae96-32291f2186bd)... @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   78645ms] [LOG] %c INFO color: #33f Creating a socket (renderer-ExtensionHost-a2471799-99aa-499f-ae96-32291f2186bd) was successful after 150 ms. @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79099ms] [WARNING] %c WARN color: #993 [ms-vscode.js-debug]: View container 'debug' does not exist and all views registered to it will be added to 'Explorer'. @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79231ms] [LOG] %c INFO color: #33f [Service Worker] registered @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79526ms] [WARNING] %c WARN color: #993 Authentication provider github was not declared in the Extension Manifest. @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79578ms] [ERROR] %c  ERR color: #f33 Bad progress location: workbench.scm: Error: Bad progress location: workbench.scm
+    at r (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:897:773)
+    at yYe.withProgress (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:897:1276)
+    at kii.$startProgress (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:576:6453)
+    at $Mt.S (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:3542:27173)
+    at $Mt.Q (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:3542:26951)
+    at $Mt.M (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:3542:26039)
+    at $Mt.L (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:3542:25140)
+    at ile.value (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:3542:23932)
+    at E.C (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:29:2349)
+    at E.fire (https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:29:2568) @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79719ms] [LOG] %c INFO color: #33f Migrating global extension storage from vue.volar to Vue.volar... @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79719ms] [LOG] %c INFO color: #33f Migrated global extension storage from vue.volar to Vue.volar @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79720ms] [LOG] %c INFO color: #33f Migrating workspace extension storage from vue.volar to Vue.volar... @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79869ms] [LOG] %c INFO color: #33f Error while migrating workspace file storage from 'vue.volar' to 'Vue.volar' File to move/copy does not exist @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   79869ms] [LOG] %c INFO color: #33f Migrated workspace extension storage from vue.volar to Vue.volar @ https://sb-qw50k4ydwuq5.vercel.run/stable-2dedf5eeb63fd9acb6b7961ba1a8278a1cc5ae66/static/out/vs/code/browser/workbench/workbench.js:37
+[   81170ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://open-vsx.org/vscode/gallery/vscode/vercel/v0-bridge/latest:0
+[   81188ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://open-vsx.org/vscode/gallery/vscode/vercel/vercel-theme/latest:0
