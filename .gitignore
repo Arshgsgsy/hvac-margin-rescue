@@ -1,11 +1,8 @@
+data/
+app/.env.local
+.env
+node_modules/
+.next/
+__pycache__/
+*.pyc
 .DS_Store
-
-# Local backup created while flattening nested repositories
-*.git.backup*
-
-# GitHub hard limit workaround: keep the raw labor log local and track
-# the compressed copy in the repo instead.
-Hack Data/labor_logs_all.csv
-
-# Local cleaned outputs
-Cleaned Data/
