@@ -6,3 +6,6 @@
 # GitHub hard limit workaround: keep the raw labor log local and track
 # the compressed copy in the repo instead.
 Hack Data/labor_logs_all.csv
+
+# Local cleaned outputs
+Cleaned Data/
