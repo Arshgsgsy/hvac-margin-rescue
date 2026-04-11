@@ -1,13 +1,12 @@
 import duckdb
 from pathlib import Path
 
-INPUT_FILE = "labor_logs_all.csv"
+INPUT_FILE = "hvac_data/labor_logs_all.csv"
 OUTPUT_DIR = Path("output_summaries")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 con = duckdb.connect()
 
-# Build cleaned labor table
 con.execute(f"""
 CREATE OR REPLACE TABLE labor AS
 SELECT
