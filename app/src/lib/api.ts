@@ -11,6 +11,29 @@ import {
 const rawApiBase = process.env.NEXT_PUBLIC_API_URL?.trim()
 const API_BASE = (rawApiBase ? rawApiBase : '/api').replace(/\/$/, '')
 
+function isLikelyUploadConnectionReset(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return normalized.includes('failed to fetch')
+    || normalized.includes('networkerror')
+    || normalized.includes('load failed')
+    || normalized.includes('socket hang up')
+    || normalized.includes('econnreset')
+}
+
+function formatLargeUploadError(message: string, totalBytes: number): string {
+  const tenMegabytes = 10 * 1024 * 1024
+
+  if (message.toLowerCase().includes('request body exceeded')) {
+    return 'Upload exceeded the frontend proxy limit. Zip the dataset or raise PROXY_CLIENT_MAX_BODY_SIZE for the Next.js server.'
+  }
+
+  if (totalBytes > tenMegabytes && isLikelyUploadConnectionReset(message)) {
+    return 'Upload connection was interrupted while sending a large dataset. Zip the files if possible, or raise PROXY_CLIENT_MAX_BODY_SIZE for the Next.js server.'
+  }
+
+  return message
+}
+
 
 async function readError(res: Response): Promise<string> {
   const contentType = res.headers.get('content-type') || ''
@@ -65,15 +88,27 @@ export async function fetchProject(id: string): Promise<Project> {
 
 export async function uploadDataset(files: File[], autoRun: boolean = true): Promise<UploadResult> {
   const formData = new FormData()
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
   for (const file of files) {
     formData.append('files', file)
   }
-  const res = await fetch(`${API_BASE}/upload?auto_run=${autoRun ? 'true' : 'false'}`, {
-    method: 'POST',
-    body: formData,
-  })
-  if (!res.ok) throw new Error(await readError(res))
-  return res.json()
+
+  try {
+    const res = await fetch(`${API_BASE}/upload?auto_run=${autoRun ? 'true' : 'false'}`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!res.ok) {
+      const message = await readError(res)
+      throw new Error(formatLargeUploadError(message, totalBytes))
+    }
+    return res.json()
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(formatLargeUploadError(error.message, totalBytes))
+    }
+    throw error
+  }
 }
 
 

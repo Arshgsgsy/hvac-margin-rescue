@@ -518,7 +518,7 @@ export function UploadPage() {
                         Drop your files here, or <span className="text-primary">browse</span>
                       </p>
                       <p className="text-muted-foreground text-sm mt-2">
-                        Supports ZIP archives and CSV files
+                        Supports ZIP archives and CSV files. ZIP is recommended for the full 10-file dataset.
                       </p>
                     </div>
                   </div>
