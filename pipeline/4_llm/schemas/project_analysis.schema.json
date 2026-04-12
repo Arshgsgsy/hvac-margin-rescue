@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ProjectAnalysis",
+  "description": "Full analysis output from the 2-agent system (Diagnosis + Recommendation)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -90,6 +91,7 @@
         "additionalProperties": false,
         "required": [
           "label",
+          "category",
           "impact_dollars",
           "confidence",
           "evidence"
@@ -97,6 +99,10 @@
         "properties": {
           "label": {
             "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["labor", "material", "billing", "change_order", "estimate", "coordination"]
           },
           "impact_dollars": {
             "type": ["number", "null"]
@@ -145,7 +151,8 @@
             "type": "string"
           },
           "owner": {
-            "type": "string"
+            "type": "string",
+            "enum": ["Project Manager", "Finance", "Operations", "Executive"]
           },
           "financial_logic": {
             "type": "string"
@@ -155,13 +162,23 @@
           },
           "urgency": {
             "type": "string",
-            "enum": ["immediate", "high", "medium", "low"]
+            "enum": ["immediate", "this_week", "this_month", "ongoing"]
+          },
+          "linked_root_cause": {
+            "type": "string",
+            "description": "Label from root_causes that this action addresses"
           }
         }
       }
     },
     "forecast_if_no_action": {
       "type": "string"
+    },
+    "forecast_with_action": {
+      "type": "string"
+    },
+    "total_recoverable_estimate": {
+      "type": ["number", "null"]
     },
     "recoverability_summary": {
       "type": "object",
@@ -170,14 +187,26 @@
         "billing_recovery_possible": {
           "type": ["boolean", "null"]
         },
+        "billing_recovery_estimate": {
+          "type": ["number", "null"]
+        },
         "change_order_recovery_possible": {
           "type": ["boolean", "null"]
+        },
+        "change_order_recovery_estimate": {
+          "type": ["number", "null"]
         },
         "retention_recovery_possible": {
           "type": ["boolean", "null"]
         },
+        "retention_amount": {
+          "type": ["number", "null"]
+        },
         "remaining_margin_protection_possible": {
           "type": ["boolean", "null"]
+        },
+        "total_estimated_recoverable": {
+          "type": ["number", "null"]
         }
       }
     },
