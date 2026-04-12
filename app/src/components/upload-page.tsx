@@ -707,46 +707,46 @@ export function UploadPage() {
                 </div>
               </div>
 
-              {/* Row 2: Projects Analyzed -> Flagged -> Critical -> Elevated -> Monitor */}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="rounded-xl border border-border bg-card p-4 text-center">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-2">
-                    <Building2 className="w-5 h-5 text-primary" />
+              {/* Row 2: Projects Analyzed and Flagged Projects (with severity breakdown inside) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-foreground">{PORTFOLIO_SUMMARY.totalProjects}</div>
+                      <div className="text-sm text-muted-foreground">Projects Analyzed</div>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{PORTFOLIO_SUMMARY.totalProjects}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Projects Analyzed</div>
                 </div>
 
-                <div className="rounded-xl border border-muted-foreground/30 bg-muted/30 p-4 text-center">
-                  <div className="w-10 h-10 rounded-lg bg-muted-foreground/10 flex items-center justify-center mx-auto mb-2">
-                    <AlertCircle className="w-5 h-5 text-muted-foreground" />
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                        <AlertCircle className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-foreground">{MOCK_PROJECTS.length}</div>
+                        <div className="text-sm text-muted-foreground">Flagged Projects</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-[#ef4444]/40 bg-[#ef4444]/10">
+                        <span className="text-lg font-bold text-[#ef4444]">{criticalProjects.length}</span>
+                        <span className="text-xs text-[#ef4444]">Critical</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-[#f97316]/40 bg-[#f97316]/10">
+                        <span className="text-lg font-bold text-[#f97316]">{warningProjects.length}</span>
+                        <span className="text-xs text-[#f97316]">Elevated</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-[#eab308]/40 bg-[#eab308]/10">
+                        <span className="text-lg font-bold text-[#eab308]">{watchProjects.length}</span>
+                        <span className="text-xs text-[#eab308]">Monitor</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{MOCK_PROJECTS.length}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Flagged</div>
-                </div>
-
-                <div className="rounded-xl border-2 border-[#ef4444]/50 bg-[#ef4444]/5 p-4 text-center">
-                  <div className="w-10 h-10 rounded-lg bg-[#ef4444]/15 flex items-center justify-center mx-auto mb-2">
-                    <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
-                  </div>
-                  <div className="text-3xl font-bold text-[#ef4444]">{criticalProjects.length}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Critical</div>
-                </div>
-
-                <div className="rounded-xl border-2 border-[#f97316]/50 bg-[#f97316]/5 p-4 text-center">
-                  <div className="w-10 h-10 rounded-lg bg-[#f97316]/15 flex items-center justify-center mx-auto mb-2">
-                    <AlertCircle className="w-5 h-5 text-[#f97316]" />
-                  </div>
-                  <div className="text-3xl font-bold text-[#f97316]">{warningProjects.length}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Elevated</div>
-                </div>
-
-                <div className="rounded-xl border-2 border-[#eab308]/50 bg-[#eab308]/5 p-4 text-center">
-                  <div className="w-10 h-10 rounded-lg bg-[#eab308]/15 flex items-center justify-center mx-auto mb-2">
-                    <Eye className="w-5 h-5 text-[#eab308]" />
-                  </div>
-                  <div className="text-3xl font-bold text-[#eab308]">{watchProjects.length}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Monitor</div>
                 </div>
               </div>
 
