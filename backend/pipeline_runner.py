@@ -122,6 +122,33 @@ def _step_payload(step: dict, *, status: str = "idle", duration: float = 0, logs
     }
 
 
+def _iter_non_empty_lines(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def _summarize_subprocess_failure(step_label: str, returncode: int, stdout: str, stderr: str) -> str:
+    for line in reversed(_iter_non_empty_lines(stderr)):
+        if line.startswith("Traceback"):
+            continue
+        return f"[ERROR] {step_label} failed (exit {returncode}): {line[:400]}"
+
+    for line in reversed(_iter_non_empty_lines(stdout)):
+        return f"[ERROR] {step_label} failed (exit {returncode}): {line[:400]}"
+
+    return f"[ERROR] {step_label} failed with exit code {returncode}"
+
+
+def _print_subprocess_failure(step_label: str, returncode: int, stdout: str, stderr: str):
+    summary = _summarize_subprocess_failure(step_label, returncode, stdout, stderr)
+    print(summary)
+
+    for line in _iter_non_empty_lines(stdout)[-10:]:
+        print(f"[{step_label}][stdout] {line}")
+
+    for line in _iter_non_empty_lines(stderr)[-10:]:
+        print(f"[{step_label}][stderr] {line}")
+
+
 def _build_pipeline_response(
     completed_steps: list[dict],
     *,
@@ -234,12 +261,14 @@ def _run_solution_stages(
                 logs.extend(f"[STDERR] {line}" for line in stderr.splitlines() if line.strip())
 
             if result.returncode != 0:
+                error_summary = _summarize_subprocess_failure(step["label"], result.returncode, stdout, stderr)
+                _print_subprocess_failure(step["label"], result.returncode, stdout, stderr)
                 results.append(
                     _step_payload(
                         step,
                         status="error",
                         duration=elapsed,
-                        logs=logs[:50] or [f"[ERROR] Command exited with code {result.returncode}"],
+                        logs=[error_summary, *logs][:50],
                     )
                 )
                 return results
@@ -256,10 +285,15 @@ def _run_solution_stages(
             timeout_logs = [f"[TIMEOUT] {step['label']} exceeded {step['timeout']}s"]
             stdout = (exc.stdout or "").strip()
             stderr = (exc.stderr or "").strip()
+            print(timeout_logs[0])
             if stdout:
                 timeout_logs.extend(line for line in stdout.splitlines() if line.strip())
             if stderr:
                 timeout_logs.extend(f"[STDERR] {line}" for line in stderr.splitlines() if line.strip())
+            for line in _iter_non_empty_lines(stdout)[-10:]:
+                print(f"[{step['label']}][stdout] {line}")
+            for line in _iter_non_empty_lines(stderr)[-10:]:
+                print(f"[{step['label']}][stderr] {line}")
 
             results.append(
                 _step_payload(

@@ -24,6 +24,24 @@ interface StepDef {
   logs: string[]
 }
 
+function extractPipelineErrorMessage(result: PipelineResult): string {
+  const firstErrorStep = result.steps.find((step) => step.status === 'error')
+  if (!firstErrorStep) return 'Pipeline execution failed'
+
+  const explicitError = firstErrorStep.logs.find((line) => line.includes('[ERROR]') || line.includes('[TIMEOUT]'))
+  if (explicitError) return explicitError
+
+  const stderrLine = [...firstErrorStep.logs]
+    .reverse()
+    .find((line) => line.startsWith('[STDERR]') && !line.includes('Traceback'))
+  if (stderrLine) {
+    return stderrLine.replace(/^\[STDERR\]\s*/, '')
+  }
+
+  const fallbackLine = [...firstErrorStep.logs].reverse().find((line) => line.trim())
+  return fallbackLine || 'Pipeline execution failed'
+}
+
 const STEPS: StepDef[] = [
   {
     id: '1_clean',
@@ -281,9 +299,7 @@ export function UploadPage() {
       applyPipelineResult(result)
 
       if (completedJob.status !== 'complete' || result.status !== 'complete') {
-        const firstErrorStep = result.steps.find((step) => step.status === 'error')
-        const errorMessage = firstErrorStep?.logs.find((line) => line.includes('[ERROR]')) || 'Pipeline execution failed'
-        throw new Error(errorMessage)
+        throw new Error(extractPipelineErrorMessage(result))
       }
 
       setDone(true)

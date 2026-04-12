@@ -27,7 +27,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from constants import (
     LLM_MODEL_ANALYSIS,
-    LLM_MAX_TOKENS_ANALYSIS,
+    LLM_MAX_TOKENS_PORTFOLIO,
     STAGE_COMPLETE_THRESHOLD,
     SEVERITY_CRITICAL_THRESHOLD,
 )
@@ -369,7 +369,7 @@ def call_portfolio_optimization_agent(portfolio_input: dict) -> dict:
 
     response = client.messages.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=4000,  # Larger output for portfolio
+        max_tokens=LLM_MAX_TOKENS_PORTFOLIO,
         system=prompt,
         messages=[{
             "role": "user",
@@ -381,7 +381,28 @@ PORTFOLIO INPUT:
         }]
     )
 
-    return extract_json_from_response(response.content[0].text)
+    text_blocks = [
+        block.text
+        for block in response.content
+        if getattr(block, "type", None) == "text" and getattr(block, "text", "")
+    ]
+    response_text = "\n".join(text_blocks).strip()
+
+    if not response_text:
+        raise RuntimeError("Portfolio optimization returned an empty response.")
+
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        raise RuntimeError(
+            "Portfolio optimization hit the max_tokens limit before finishing the JSON response."
+        )
+
+    try:
+        return extract_json_from_response(response_text)
+    except Exception as exc:
+        preview = re.sub(r"\s+", " ", response_text[:500]).strip()
+        raise RuntimeError(
+            f"Portfolio optimization returned invalid JSON: {exc}. Response preview: {preview}"
+        ) from exc
 
 
 def optimize_portfolio(
