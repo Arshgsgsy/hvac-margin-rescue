@@ -4,53 +4,28 @@
 
 @layer base {
   :root {
-    --background: 40 33% 96%;
-    --foreground: 230 50% 15%;
-    --card: 40 40% 98%;
-    --card-foreground: 230 50% 15%;
-    --popover: 40 40% 98%;
-    --popover-foreground: 230 50% 15%;
-    --primary: 230 50% 25%;
-    --primary-foreground: 40 33% 96%;
-    --primary-light: 230 50% 35%;
-    --primary-dark: 230 50% 18%;
-    --secondary: 40 30% 92%;
-    --secondary-foreground: 230 50% 15%;
-    --muted: 40 25% 90%;
-    --muted-foreground: 230 20% 45%;
-    --accent: 15 85% 65%;
-    --accent-foreground: 40 33% 98%;
-    --destructive: 0 84% 60%;
+    --background: 220 30% 5%;
+    --foreground: 210 40% 97%;
+    --card: 220 25% 8%;
+    --card-foreground: 210 40% 97%;
+    --popover: 220 25% 8%;
+    --popover-foreground: 210 40% 97%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 217 91% 70%;
+    --primary-dark: 224 76% 42%;
+    --secondary: 220 20% 13%;
+    --secondary-foreground: 210 40% 97%;
+    --muted: 220 20% 13%;
+    --muted-foreground: 215 20% 52%;
+    --accent: 220 20% 16%;
+    --accent-foreground: 210 40% 97%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 230 30% 80%;
-    --input: 230 30% 85%;
-    --ring: 230 50% 25%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 230 50% 8%;
-    --foreground: 40 33% 96%;
-    --card: 230 50% 12%;
-    --card-foreground: 40 33% 96%;
-    --popover: 230 50% 12%;
-    --popover-foreground: 40 33% 96%;
-    --primary: 15 85% 65%;
-    --primary-foreground: 230 50% 10%;
-    --primary-light: 15 85% 72%;
-    --primary-dark: 15 85% 55%;
-    --secondary: 230 40% 18%;
-    --secondary-foreground: 40 33% 96%;
-    --muted: 230 40% 18%;
-    --muted-foreground: 40 20% 65%;
-    --accent: 15 85% 55%;
-    --accent-foreground: 40 33% 98%;
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 230 40% 25%;
-    --input: 230 40% 25%;
-    --ring: 15 85% 65%;
-    --radius: 0.5rem;
+    --border: 220 20% 14%;
+    --input: 220 20% 14%;
+    --ring: 217 91% 60%;
+    --radius: 0.75rem;
   }
 }
 
@@ -63,60 +38,3 @@
 ::-webkit-scrollbar-track { background: hsl(var(--background)); }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary)); }
-
-/* Custom animations */
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(147, 51, 234, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(147, 51, 234, 0.6); }
-}
-
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-@keyframes bounce-gentle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-@keyframes scale-in {
-  0% { transform: scale(0.9); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes slide-up-fade {
-  0% { transform: translateY(30px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes rotate-slow {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.animate-float { animation: float 6s ease-in-out infinite; }
-.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-.animate-gradient { animation: gradient-shift 8s ease infinite; background-size: 200% 200%; }
-.animate-shimmer { animation: shimmer 2s infinite; }
-.animate-bounce-gentle { animation: bounce-gentle 2s ease-in-out infinite; }
-.animate-scale-in { animation: scale-in 0.5s ease-out forwards; }
-.animate-slide-up-fade { animation: slide-up-fade 0.6s ease-out forwards; }
-.animate-rotate-slow { animation: rotate-slow 20s linear infinite; }
-
-.animation-delay-100 { animation-delay: 100ms; }
-.animation-delay-200 { animation-delay: 200ms; }
-.animation-delay-300 { animation-delay: 300ms; }
-.animation-delay-400 { animation-delay: 400ms; }
-.animation-delay-500 { animation-delay: 500ms; }

@@ -7,13 +7,13 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'MarginIQ | Upload Financial Data',
-  description: 'Upload your company financial data to analyze margins, detect risks, and discover recovery opportunities with AI-powered insights.',
+  title: 'Margin Variance Intelligence | HVAC Portfolio Dashboard',
+  description: 'CFO-grade margin monitoring and root cause analysis for HVAC project portfolios',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
         {children}
         <Analytics />
