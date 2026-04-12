@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar, ChevronDown } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, TrendingUp, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar, Clock, ChevronDown } from 'lucide-react'
 import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
 import { Project } from '@/lib/types'
 import { InvestigateModal } from './investigate-modal'
@@ -747,6 +747,243 @@ export function UploadPage() {
                 </div>
               </div>
 
+              {/* Company Performance Metrics with Time Filter */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground">Company Performance Metrics</h3>
+                    <p className="text-sm text-muted-foreground">Track overall financial health and KPIs over time</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+                      {TIME_RANGES.filter(r => r.id !== 'custom').map((range) => (
+                        <button
+                          key={range.id}
+                          onClick={() => setSelectedTimeRange(range.id)}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                            selectedTimeRange === range.id
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {range.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Range Slider */}
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-foreground">Fine-tune date range</span>
+                    <span className="text-sm text-muted-foreground">
+                      {customStartDate || '2024-01-01'} — {customEndDate || '2025-12-31'}
+                    </span>
+                  </div>
+                  <div className="relative pt-2 pb-4">
+                    <div className="h-2 rounded-full bg-muted relative">
+                      <div 
+                        className="absolute h-full rounded-full bg-gradient-to-r from-primary/60 to-primary"
+                        style={{ left: '10%', right: '10%' }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      defaultValue="0"
+                      onChange={(e) => {
+                        const months = ['2024-01', '2024-04', '2024-07', '2024-10', '2025-01', '2025-04', '2025-07', '2025-10', '2025-12']
+                        const idx = Math.floor((parseInt(e.target.value) / 100) * (months.length - 1))
+                        setCustomStartDate(`${months[idx]}-01`)
+                      }}
+                      className="absolute top-0 left-0 w-1/2 h-6 opacity-0 cursor-grab active:cursor-grabbing"
+                    />
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      defaultValue="100"
+                      onChange={(e) => {
+                        const months = ['2024-01', '2024-04', '2024-07', '2024-10', '2025-01', '2025-04', '2025-07', '2025-10', '2025-12']
+                        const idx = Math.floor((parseInt(e.target.value) / 100) * (months.length - 1))
+                        setCustomEndDate(`${months[idx]}-28`)
+                      }}
+                      className="absolute top-0 right-0 w-1/2 h-6 opacity-0 cursor-grab active:cursor-grabbing"
+                    />
+                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                      <span>Jan 2024</span>
+                      <span>Jul 2024</span>
+                      <span>Jan 2025</span>
+                      <span>Dec 2025</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Performance Indicator Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      </div>
+                      <span className="text-sm text-muted-foreground">Avg Profit Margin</span>
+                    </div>
+                    <div className="text-2xl font-bold text-foreground">12.4%</div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-emerald-500">+2.1%</span>
+                      <span className="text-xs text-muted-foreground">vs last period</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <BarChart3 className="w-4 h-4 text-primary" />
+                      </div>
+                      <span className="text-sm text-muted-foreground">Revenue</span>
+                    </div>
+                    <div className="text-2xl font-bold text-foreground">$47.2M</div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-emerald-500">+8.5%</span>
+                      <span className="text-xs text-muted-foreground">YoY growth</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-orange-500" />
+                      </div>
+                      <span className="text-sm text-muted-foreground">Avg Days to Close</span>
+                    </div>
+                    <div className="text-2xl font-bold text-foreground">127</div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-destructive">+12 days</span>
+                      <span className="text-xs text-muted-foreground">vs target</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-destructive" />
+                      </div>
+                      <span className="text-sm text-muted-foreground">Cost Variance</span>
+                    </div>
+                    <div className="text-2xl font-bold text-destructive">-4.7%</div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-muted-foreground">Avg budget overrun</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monthly Trend Line Chart - Full Width with Time Filter */}
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <h4 className="font-semibold text-foreground mb-2">Monthly Overrun vs Recovery Trend</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Track how cost overruns and successful recoveries trend over time. A widening gap indicates growing exposure, while convergence shows effective cost control measures taking effect.
+                  </p>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={monthlyTrendData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="month" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                        <YAxis 
+                          tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                          tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip 
+                          formatter={(value: number) => [formatCurrency(value)]}
+                          contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                        />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="overrun" 
+                          stroke="#ef4444" 
+                          strokeWidth={2}
+                          name="Overrun"
+                          dot={{ fill: '#ef4444' }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="recovered" 
+                          stroke="#10b981" 
+                          strokeWidth={2}
+                          name="Recovered"
+                          dot={{ fill: '#10b981' }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Charts Section - No Time Filter */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-bold text-foreground">Project Analysis</h3>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Severity Distribution Pie Chart */}
+                  <div className="rounded-xl border border-border bg-card p-5">
+                    <h4 className="font-semibold text-foreground mb-2">Projects by Severity Level</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Distribution of flagged projects across severity levels. Critical projects need immediate attention.
+                    </p>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={severityChartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={3}
+                            dataKey="value"
+                            label={({ name, value }) => `${name}: ${value}`}
+                          >
+                            {severityChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Overrun by Category Bar Chart */}
+                  <div className="rounded-xl border border-border bg-card p-5">
+                    <h4 className="font-semibold text-foreground mb-2">Cost Overrun by Category</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Labor costs are typically the largest contributor to project overruns. This breakdown helps identify focus areas.
+                    </p>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={overrunByCategory}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="category" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                          <YAxis 
+                            tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          />
+                          <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* General Recommendations Section */}
               <div className="space-y-4">
                 <h3 className="text-xl font-bold text-foreground">General Recommendations</h3>
@@ -791,166 +1028,6 @@ export function UploadPage() {
                           </p>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Time Range Filter Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">Historical Analysis</h3>
-                    <p className="text-sm text-muted-foreground">View data across different time periods</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Adjust time range:</span>
-                  </div>
-                </div>
-
-                {/* Time range buttons */}
-                <div className="flex flex-wrap gap-2">
-                  {TIME_RANGES.map((range) => (
-                    <button
-                      key={range.id}
-                      onClick={() => {
-                        setSelectedTimeRange(range.id)
-                        setShowCustomDatePicker(range.id === 'custom')
-                      }}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedTimeRange === range.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      {range.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Custom date picker */}
-                {showCustomDatePicker && (
-                  <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-muted-foreground">From:</label>
-                      <input
-                        type="date"
-                        value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-muted-foreground">To:</label>
-                      <input
-                        type="date"
-                        value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
-                      />
-                    </div>
-                    <button className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
-                      Apply
-                    </button>
-                  </div>
-                )}
-
-                {/* Charts with explanations */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Severity Distribution Pie Chart */}
-                  <div className="rounded-xl border border-border bg-card p-5">
-                    <h4 className="font-semibold text-foreground mb-2">Projects by Severity Level</h4>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      This chart shows how flagged projects are distributed across severity levels. Critical projects need immediate attention, while Monitor projects should be tracked for potential escalation.
-                    </p>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={severityChartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={90}
-                            paddingAngle={3}
-                            dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
-                          >
-                            {severityChartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Overrun by Category Bar Chart */}
-                  <div className="rounded-xl border border-border bg-card p-5">
-                    <h4 className="font-semibold text-foreground mb-2">Cost Overrun by Category</h4>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Labor costs are typically the largest contributor to project overruns. This breakdown helps identify whether to focus on workforce management or material procurement.
-                    </p>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={overrunByCategory}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="category" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                          <YAxis 
-                            tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                          />
-                          <Tooltip 
-                            formatter={(value: number) => [formatCurrency(value), 'Amount']}
-                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                          />
-                          <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Monthly Trend Line Chart - full width */}
-                  <div className="rounded-xl border border-border bg-card p-5 lg:col-span-2">
-                    <h4 className="font-semibold text-foreground mb-2">Monthly Overrun vs Recovery Trend</h4>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Track how cost overruns and successful recoveries trend over time. A widening gap indicates growing exposure, while convergence shows effective cost control measures taking effect.
-                    </p>
-                    <div className="h-72">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={monthlyTrendData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="month" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                          <YAxis 
-                            tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                          />
-                          <Tooltip 
-                            formatter={(value: number) => [formatCurrency(value)]}
-                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                          />
-                          <Legend />
-                          <Line 
-                            type="monotone" 
-                            dataKey="overrun" 
-                            stroke="#ef4444" 
-                            strokeWidth={2}
-                            name="Overrun"
-                            dot={{ fill: '#ef4444' }}
-                          />
-                          <Line 
-                            type="monotone" 
-                            dataKey="recovered" 
-                            stroke="#10b981" 
-                            strokeWidth={2}
-                            name="Recovered"
-                            dot={{ fill: '#10b981' }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
                     </div>
                   </div>
                 </div>
