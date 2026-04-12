@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { Project, ChatMessage } from '@/lib/types'
 import { formatCurrency, formatPercent } from '@/lib/data'
-import { buildProjectContext } from '@/lib/agent'
+import { API_BASE } from '@/lib/api'
 import CostBreakdown from '@/components/charts/cost-breakdown'
 
 interface Props {
@@ -14,14 +14,6 @@ const severityStyle: Record<string, { text: string; bg: string }> = {
   critical: { text: '#f87171', bg: '#7f1d1d' },
   warning: { text: '#fbbf24', bg: '#78350f' },
   watch: { text: '#60a5fa', bg: '#1e3a5f' },
-}
-
-const catIcon: Record<string, string> = {
-  billing: 'B',
-  change_order: 'CO',
-  labor: 'L',
-  material: 'M',
-  renegotiation: 'R',
 }
 
 export default function ProjectDrilldown({ project }: Props) {
@@ -44,10 +36,10 @@ export default function ProjectDrilldown({ project }: Props) {
     setMessages((prev) => [...prev, assistantMsg])
 
     try {
-      const res = await fetch('/api/agent', {
+      const res = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectContext: buildProjectContext(project), question: q }),
+        body: JSON.stringify({ project_id: project.id, question: q }),
       })
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -70,15 +62,13 @@ export default function ProjectDrilldown({ project }: Props) {
     } catch {
       setMessages((prev) => {
         const next = [...prev]
-        next[next.length - 1] = { ...next[next.length - 1], content: 'Error: Could not reach agent. Check ANTHROPIC_API_KEY in .env.local' }
+        next[next.length - 1] = { ...next[next.length - 1], content: 'Error: Could not reach agent. Ensure the FastAPI backend is running.' }
         return next
       })
     }
 
     setLoading(false)
   }
-
-  const totalRecovery = project.recoveryActions?.reduce((s, a) => s + a.amount, 0) ?? 0
 
   const SUGGESTED = [
     'Why did the margin erode on this project?',
@@ -101,19 +91,13 @@ export default function ProjectDrilldown({ project }: Props) {
             </div>
             <h1 className="text-2xl font-bold text-white">{project.name}</h1>
           </div>
-          {totalRecovery > 0 && (
-            <div className="text-right">
-              <p className="text-xs mb-1" style={{ color: '#64748b' }}>Recovery Potential</p>
-              <p className="text-3xl font-bold" style={{ color: '#4ade80' }}>{formatCurrency(totalRecovery)}</p>
-            </div>
-          )}
         </div>
         <div className="grid grid-cols-2 gap-4 mt-4 sm:grid-cols-4">
           {[
-            { label: 'Contract Value', value: formatCurrency(project.contractValue), color: '#94a3b8' },
-            { label: 'Bid Margin', value: formatPercent(project.bidMargin), color: '#94a3b8' },
-            { label: 'Realized Margin', value: formatPercent(project.realizedMargin), color: cfg.text },
-            { label: 'Erosion', value: `-${formatPercent(Math.abs(project.marginDelta))}`, color: cfg.text },
+            { label: 'Contract Value', value: formatCurrency(project.contract_value), color: '#94a3b8' },
+            { label: 'Bid Margin', value: formatPercent(project.bid_margin), color: '#94a3b8' },
+            { label: 'Realized Margin', value: formatPercent(project.realized_margin), color: cfg.text },
+            { label: 'Erosion', value: `-${formatPercent(Math.abs(project.margin_delta))}`, color: cfg.text },
           ].map((s) => (
             <div key={s.label} className="rounded p-3" style={{ background: '#1a2235' }}>
               <p className="text-xs mb-1" style={{ color: '#475569' }}>{s.label}</p>
@@ -131,16 +115,16 @@ export default function ProjectDrilldown({ project }: Props) {
           <div className="mt-4 p-3 rounded" style={{ background: '#1a2235' }}>
             <div className="flex justify-between text-sm mb-1">
               <span style={{ color: '#64748b' }}>% Complete</span>
-              <span className="font-mono" style={{ color: '#94a3b8' }}>{formatPercent(project.billingStatus.percentComplete)}</span>
+              <span className="font-mono" style={{ color: '#94a3b8' }}>{formatPercent(project.billing_status.percent_complete)}</span>
             </div>
             <div className="flex justify-between text-sm mb-2">
               <span style={{ color: '#64748b' }}>% Billed</span>
-              <span className="font-mono" style={{ color: '#f59e0b' }}>{formatPercent(project.billingStatus.percentBilled)}</span>
+              <span className="font-mono" style={{ color: '#f59e0b' }}>{formatPercent(project.billing_status.percent_billed)}</span>
             </div>
             <div className="flex justify-between text-sm border-t pt-2" style={{ borderColor: '#1e3a5f' }}>
               <span className="font-medium" style={{ color: '#fbbf24' }}>Billing Gap</span>
               <span className="font-bold font-mono" style={{ color: '#fbbf24' }}>
-                {formatCurrency(project.contractValue * project.billingGap)} unbilled
+                {formatCurrency(project.contract_value * project.billing_gap)} unbilled
               </span>
             </div>
           </div>
@@ -149,76 +133,38 @@ export default function ProjectDrilldown({ project }: Props) {
         {/* Root Cause */}
         <div className="rounded-lg border p-5" style={{ background: '#111827', borderColor: '#1e3a5f' }}>
           <h2 className="text-white font-semibold mb-4">Root Cause Analysis</h2>
-          {project.rootCause ? (
-            <p className="text-sm leading-relaxed" style={{ color: '#94a3b8' }}>{project.rootCause}</p>
+          {project.root_cause ? (
+            <p className="text-sm leading-relaxed" style={{ color: '#94a3b8' }}>{project.root_cause}</p>
           ) : (
             <p className="text-sm" style={{ color: '#475569' }}>Ask the agent below for analysis.</p>
           )}
-          {project.fieldNoteSummary && (
+          {project.field_note_summary && (
             <div className="mt-4 p-3 rounded border-l-2" style={{ background: '#1a2235', borderColor: '#3b82f6' }}>
               <p className="text-xs font-semibold mb-1" style={{ color: '#60a5fa' }}>Field Notes</p>
-              <p className="text-xs leading-relaxed" style={{ color: '#64748b' }}>{project.fieldNoteSummary}</p>
+              <p className="text-xs leading-relaxed" style={{ color: '#64748b' }}>{project.field_note_summary}</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Recovery Actions */}
-      {project.recoveryActions && project.recoveryActions.length > 0 && (
-        <div className="rounded-lg border p-5" style={{ background: '#111827', borderColor: '#1e3a5f' }}>
-          <h2 className="text-white font-semibold mb-4">Recovery Actions</h2>
-          <div className="space-y-2">
-            {project.recoveryActions.map((action, i) => (
-              <div key={i} className="flex items-center justify-between gap-4 p-3 rounded" style={{ background: '#1a2235' }}>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span
-                    className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-xs font-bold"
-                    style={{ background: '#1e3a5f', color: '#60a5fa' }}
-                  >
-                    {catIcon[action.category] ?? '?'}
-                  </span>
-                  <div>
-                    <p className="text-sm text-white">{action.description}</p>
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded mt-1 inline-block"
-                      style={{
-                        background: action.priority === 'high' ? '#7f1d1d' : action.priority === 'medium' ? '#78350f' : '#1e3a5f',
-                        color: action.priority === 'high' ? '#f87171' : action.priority === 'medium' ? '#fbbf24' : '#60a5fa',
-                      }}
-                    >
-                      {action.priority}
-                    </span>
-                  </div>
-                </div>
-                {action.amount > 0 && (
-                  <span className="font-bold flex-shrink-0 font-mono" style={{ color: '#4ade80' }}>
-                    {formatCurrency(action.amount)}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Change Orders + RFIs */}
-      {((project.changeOrders?.length ?? 0) > 0 || (project.rfis?.length ?? 0) > 0) && (
+      {((project.change_orders?.length ?? 0) > 0 || (project.rfis?.length ?? 0) > 0) && (
         <div className="grid gap-6 lg:grid-cols-2">
-          {(project.changeOrders?.length ?? 0) > 0 && (
+          {(project.change_orders?.length ?? 0) > 0 && (
             <div className="rounded-lg border p-5" style={{ background: '#111827', borderColor: '#1e3a5f' }}>
               <h2 className="text-white font-semibold mb-4">Change Orders</h2>
               <div className="space-y-2">
-                {project.changeOrders!.map((co) => (
+                {project.change_orders!.map((co) => (
                   <div key={co.id} className="flex justify-between items-start text-sm p-2 rounded" style={{ background: '#1a2235' }}>
                     <div>
                       <code className="text-xs font-mono" style={{ color: '#60a5fa' }}>{co.id}</code>
                       <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>{co.description}</p>
-                      <span className="text-xs" style={{ color: co.status === 'submitted' ? '#4ade80' : '#f59e0b' }}>
+                      <span className="text-xs" style={{ color: co.status.toLowerCase() === 'approved' ? '#4ade80' : '#f59e0b' }}>
                         {co.status}
                       </span>
                     </div>
                     <span className="font-mono font-semibold" style={{ color: '#fbbf24' }}>
-                      {formatCurrency(co.costIncurred)}
+                      {formatCurrency(co.amount)}
                     </span>
                   </div>
                 ))}
@@ -237,7 +183,7 @@ export default function ProjectDrilldown({ project }: Props) {
                       <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>{rfi.description}</p>
                     </div>
                     <span className="text-xs font-medium" style={{ color: rfi.status === 'open' ? '#f87171' : '#4ade80' }}>
-                      {rfi.status === 'open' ? `open ${rfi.daysOpen}d` : 'closed'}
+                      {rfi.status === 'open' ? `open ${rfi.days_open}d` : 'closed'}
                     </span>
                   </div>
                 ))}

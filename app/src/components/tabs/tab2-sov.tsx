@@ -4,8 +4,13 @@ import { useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
-import { MOCK_PROJECTS, formatCurrency, formatPercent } from '@/lib/data'
+import { formatCurrency } from '@/lib/data'
+import { Project } from '@/lib/types'
 import { ChevronDown } from 'lucide-react'
+
+interface Props {
+  projects: Project[]
+}
 
 const CustomTip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null
@@ -20,16 +25,21 @@ const CustomTip = ({ active, payload }: any) => {
   )
 }
 
-export function Tab2SOV() {
-  const [selectedId, setSelectedId] = useState(MOCK_PROJECTS[0].id)
-  const project = MOCK_PROJECTS.find(p => p.id === selectedId)!
-  const sovData = (project.sovLines ?? []).map(s => ({
+export function Tab2SOV({ projects }: Props) {
+  const [selectedId, setSelectedId] = useState(projects[0]?.id ?? '')
+  const project = projects.find(p => p.id === selectedId)
+
+  if (!project || projects.length === 0) {
+    return <p className="text-muted-foreground text-sm py-8">No data available. Run the pipeline first.</p>
+  }
+
+  const sovData = (project.sov_lines ?? []).map(s => ({
     name: s.name.length > 22 ? s.name.slice(0, 22) + '...' : s.name,
     fullName: s.name,
     budgeted: s.budgeted,
     actual: s.actual,
     variance: s.budgeted - s.actual,
-    variancePct: ((s.actual - s.budgeted) / s.budgeted * 100).toFixed(1),
+    variancePct: s.budgeted > 0 ? ((s.actual - s.budgeted) / s.budgeted * 100).toFixed(1) : '0.0',
   })).sort((a, b) => a.variance - b.variance)
 
   return (
@@ -43,7 +53,7 @@ export function Tab2SOV() {
             onChange={e => setSelectedId(e.target.value)}
             className="appearance-none bg-card border border-border text-foreground text-sm rounded-xl px-4 py-2 pr-9 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
           >
-            {MOCK_PROJECTS.map(p => (
+            {projects.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
@@ -54,7 +64,7 @@ export function Tab2SOV() {
       {/* Waterfall / grouped bar */}
       <div className="rounded-2xl border border-border/50 p-6" style={{ background: 'rgba(255,255,255,0.03)' }}>
         <div className="mb-4">
-          <h3 className="text-foreground font-semibold">SOV Variance â€” Budget vs Actual</h3>
+          <h3 className="text-foreground font-semibold">SOV Variance -- Budget vs Actual</h3>
           <p className="text-muted-foreground text-xs mt-0.5">Worst overruns sorted to top. Red = over budget.</p>
         </div>
         <div style={{ height: 280 }}>

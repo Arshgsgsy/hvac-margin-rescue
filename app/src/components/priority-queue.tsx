@@ -1,7 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { MOCK_PROJECTS, getSortedByPriority, formatCurrency, formatPercent } from '@/lib/data'
+import { Project } from '@/lib/types'
+import { getSortedByPriority, formatCurrency, formatPercent } from '@/lib/data'
+
+interface Props {
+  projects: Project[]
+}
 
 const RANK_STYLES = [
   { badge: 'bg-destructive/20 text-destructive border-destructive/30', ring: 'hsl(var(--destructive))' },
@@ -9,8 +14,8 @@ const RANK_STYLES = [
   { badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', ring: '#eab308' },
 ]
 
-export default function PriorityQueue() {
-  const ranked = getSortedByPriority(MOCK_PROJECTS)
+export default function PriorityQueue({ projects }: Props) {
+  const ranked = getSortedByPriority(projects)
   const top3 = ranked.slice(0, 3)
 
   return (
@@ -28,15 +33,15 @@ export default function PriorityQueue() {
           </p>
         </div>
         <a href="#all-projects" className="text-sm hidden md:block" style={{ color: 'hsl(var(--primary))' }}>
-          View all {MOCK_PROJECTS.length} flagged â†’
+          View all {projects.length} flagged &rarr;
         </a>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         {top3.map((project, i) => {
           const style = RANK_STYLES[i]
-          const topAction = project.recoveryActions?.[0]
-          const totalRecovery = project.recoveryActions?.reduce((s, a) => s + a.amount, 0) ?? 0
+          const topAction = project.recovery_actions?.[0]
+          const totalRecovery = project.recovery_actions?.reduce((s, a) => s + a.amount, 0) ?? 0
 
           return (
             <div key={project.id}
@@ -47,7 +52,6 @@ export default function PriorityQueue() {
                 backdropFilter: 'blur(8px)',
                 boxShadow: `0 0 0 1px ${style.ring}20`,
               }}>
-              {/* Header */}
               <div className="p-5 pb-4 flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
@@ -61,25 +65,23 @@ export default function PriorityQueue() {
                 </div>
               </div>
 
-              {/* Margin visual */}
               <div className="px-5 pb-4">
                 <div className="flex justify-between text-xs mb-1.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   <span>Margin erosion</span>
                   <span className="font-bold" style={{ color: style.ring }}>
-                    -{formatPercent(Math.abs(project.marginDelta))}
+                    -{formatPercent(Math.abs(project.margin_delta))}
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(var(--border))' }}>
                   <div className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(Math.abs(project.marginDelta) * 500, 100)}%`, background: style.ring }} />
+                    style={{ width: `${Math.min(Math.abs(project.margin_delta) * 500, 100)}%`, background: style.ring }} />
                 </div>
                 <div className="flex justify-between text-xs mt-1.5">
-                  <span style={{ color: 'hsl(var(--muted-foreground))' }}>Realized: {formatPercent(project.realizedMargin)}</span>
-                  <span style={{ color: 'hsl(var(--muted-foreground))' }}>Bid: {formatPercent(project.bidMargin)}</span>
+                  <span style={{ color: 'hsl(var(--muted-foreground))' }}>Realized: {formatPercent(project.realized_margin)}</span>
+                  <span style={{ color: 'hsl(var(--muted-foreground))' }}>Bid: {formatPercent(project.bid_margin)}</span>
                 </div>
               </div>
 
-              {/* Top action */}
               {topAction && (
                 <div className="mx-5 mb-4 p-3 rounded-lg" style={{ background: 'hsl(var(--secondary))' }}>
                   <p className="text-xs font-semibold mb-1" style={{ color: 'hsl(var(--primary))' }}>Immediate Action</p>
@@ -87,7 +89,6 @@ export default function PriorityQueue() {
                 </div>
               )}
 
-              {/* Footer */}
               <div className="mt-auto px-5 pb-5 flex items-center justify-between">
                 <div>
                   <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Recovery potential</p>

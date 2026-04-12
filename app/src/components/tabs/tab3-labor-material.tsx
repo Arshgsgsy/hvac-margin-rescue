@@ -5,8 +5,13 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import { MOCK_PROJECTS, formatCurrency } from '@/lib/data'
+import { formatCurrency } from '@/lib/data'
+import { Project } from '@/lib/types'
 import { ChevronDown } from 'lucide-react'
+
+interface Props {
+  projects: Project[]
+}
 
 const CONDITION_COLORS: Record<string, string> = {
   Good: '#22c55e',
@@ -15,22 +20,26 @@ const CONDITION_COLORS: Record<string, string> = {
   Reordered: '#a855f7',
 }
 
-export function Tab3LaborMaterial() {
-  const [selectedId, setSelectedId] = useState(MOCK_PROJECTS[0].id)
-  const project = MOCK_PROJECTS.find(p => p.id === selectedId)!
-  const laborData = project.laborByWeek ?? []
-  const materials = project.materialDeliveries ?? []
+export function Tab3LaborMaterial({ projects }: Props) {
+  const [selectedId, setSelectedId] = useState(projects[0]?.id ?? '')
+  const project = projects.find(p => p.id === selectedId)
+
+  if (!project || projects.length === 0) {
+    return <p className="text-muted-foreground text-sm py-8">No data available. Run the pipeline first.</p>
+  }
+
+  const laborData = project.labor_by_week ?? []
+  const materials = project.material_deliveries ?? []
 
   const conditionCounts = materials.reduce<Record<string, number>>((acc, m) => {
-    acc[m.condition] = (acc[m.condition] ?? 0) + 1
+    const cond = m.condition.includes('Partial') ? 'Partial'
+      : m.condition.includes('Damaged') ? 'Damaged'
+      : m.condition.includes('Reorder') ? 'Reordered'
+      : 'Good'
+    acc[cond] = (acc[cond] ?? 0) + 1
     return acc
   }, {})
   const pieData = Object.entries(conditionCounts).map(([name, value]) => ({ name, value }))
-
-  const materialOverruns = [...materials]
-    .filter(m => m.actualCost > m.budgetedCost)
-    .sort((a, b) => (b.actualCost - b.budgetedCost) - (a.actualCost - a.budgetedCost))
-    .slice(0, 5)
 
   return (
     <div className="space-y-6">
@@ -42,7 +51,7 @@ export function Tab3LaborMaterial() {
             onChange={e => setSelectedId(e.target.value)}
             className="appearance-none bg-card border border-border text-foreground text-sm rounded-xl px-4 py-2 pr-9 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
           >
-            {MOCK_PROJECTS.map(p => (
+            {projects.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
@@ -73,7 +82,6 @@ export function Tab3LaborMaterial() {
 
       {/* Material panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie chart */}
         <div className="rounded-2xl border border-border/50 p-6" style={{ background: 'rgba(255,255,255,0.03)' }}>
           <h3 className="text-foreground font-semibold mb-4">Material Condition on Delivery</h3>
           {pieData.length > 0 ? (
@@ -94,30 +102,24 @@ export function Tab3LaborMaterial() {
           )}
         </div>
 
-        {/* Price spikes */}
         <div className="rounded-2xl border border-border/50 p-6" style={{ background: 'rgba(255,255,255,0.03)' }}>
-          <h3 className="text-foreground font-semibold mb-4">Top Material Cost Overruns</h3>
-          {materialOverruns.length > 0 ? (
+          <h3 className="text-foreground font-semibold mb-4">Material Deliveries</h3>
+          {materials.length > 0 ? (
             <div className="space-y-3">
-              {materialOverruns.map((m, i) => {
-                const over = m.actualCost - m.budgetedCost
-                const pct = ((over / m.budgetedCost) * 100).toFixed(0)
-                return (
-                  <div key={i} className="flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-foreground text-xs font-medium truncate">{m.description}</p>
-                      <p className="text-muted-foreground text-xs">Budget: {formatCurrency(m.budgetedCost)}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-red-400 text-sm font-semibold">+{formatCurrency(over)}</p>
-                      <p className="text-red-400/70 text-xs">+{pct}%</p>
-                    </div>
+              {materials.slice(0, 8).map((m, i) => (
+                <div key={i} className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-foreground text-xs font-medium truncate">{m.description}</p>
+                    <p className="text-muted-foreground text-xs">{m.date} | {m.vendor}</p>
                   </div>
-                )
-              })}
+                  <div className="text-right shrink-0">
+                    <p className="text-foreground text-sm font-semibold">{formatCurrency(m.total_cost)}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">No material overruns for this project.</p>
+            <p className="text-muted-foreground text-sm">No material deliveries for this project.</p>
           )}
         </div>
       </div>

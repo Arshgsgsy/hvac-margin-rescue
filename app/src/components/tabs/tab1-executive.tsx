@@ -2,10 +2,16 @@
 
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-  LineChart, Line, CartesianGrid, Legend, ReferenceLine,
+  LineChart, Line, CartesianGrid, Legend,
 } from 'recharts'
-import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent, getSortedByPriority } from '@/lib/data'
+import { formatCurrency, formatPercent, getSortedByPriority } from '@/lib/data'
+import { Project, PortfolioSummary } from '@/lib/types'
 import { TrendingDown, DollarSign, AlertTriangle, FileWarning } from 'lucide-react'
+
+interface Props {
+  projects: Project[]
+  portfolio: PortfolioSummary | null
+}
 
 const CustomBarTip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null
@@ -32,39 +38,38 @@ const CustomLineTip = ({ active, payload, label }: any) => {
   )
 }
 
-export function Tab1Executive() {
-  const sorted = getSortedByPriority(MOCK_PROJECTS)
-  const bottom10 = [...MOCK_PROJECTS]
-    .sort((a, b) => a.marginDelta - b.marginDelta)
+export function Tab1Executive({ projects, portfolio }: Props) {
+  if (!portfolio || projects.length === 0) {
+    return <p className="text-muted-foreground text-sm py-8">No data available. Run the pipeline first.</p>
+  }
+
+  const bottom10 = [...projects]
+    .sort((a, b) => a.margin_delta - b.margin_delta)
     .slice(0, 8)
     .map((p) => ({
       name: p.name.length > 28 ? p.name.slice(0, 28) + '...' : p.name,
       fullName: p.name,
-      bidRaw: p.bidMargin,
-      realizedRaw: p.realizedMargin,
-      bid: +(p.bidMargin * 100).toFixed(1),
-      realized: +(p.realizedMargin * 100).toFixed(1),
-      varianceDollars: Math.abs(p.marginDelta) * p.contractValue,
+      bidRaw: p.bid_margin,
+      realizedRaw: p.realized_margin,
+      bid: +(p.bid_margin * 100).toFixed(1),
+      realized: +(p.realized_margin * 100).toFixed(1),
+      varianceDollars: Math.abs(p.margin_delta) * p.contract_value,
       severity: p.severity,
     }))
 
-  const totalUnbilledCOs = MOCK_PROJECTS.flatMap(p => p.changeOrders ?? [])
-    .filter(co => !co.billedToClient)
-    .reduce((sum, co) => sum + co.costIncurred, 0)
-
-  const totalMarginVariance = MOCK_PROJECTS.reduce(
-    (sum, p) => sum + p.marginDelta * p.contractValue, 0
+  const totalMarginVariance = projects.reduce(
+    (sum, p) => sum + p.margin_delta * p.contract_value, 0
   )
 
-  const allBillingData = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'].map((month) => {
-    let billed = 0
-    let cost = 0
-    MOCK_PROJECTS.forEach((p) => {
-      const m = (p.billingHistory ?? []).find((b) => b.month === month)
-      if (m) { billed += m.billed; cost += m.actualCost }
-    })
-    return { month, billed, cost }
-  }).filter(d => d.billed > 0 || d.cost > 0)
+  const totalUnbilledCOs = projects.flatMap(p => p.change_orders ?? [])
+    .filter(co => co.status.toLowerCase() !== 'approved')
+    .reduce((sum, co) => sum + co.amount, 0)
+
+  const allBillingData = (projects[0]?.billing_history ?? []).map((b) => ({
+    period: b.period_end,
+    billed: b.period_total,
+    cost: b.cumulative_billed,
+  })).slice(0, 8)
 
   const severityColor: Record<string, string> = {
     critical: '#ef4444',
@@ -79,7 +84,7 @@ export function Tab1Executive() {
         {[
           {
             label: 'Avg Bid Margin',
-            value: formatPercent(PORTFOLIO_SUMMARY.avgBidMargin),
+            value: formatPercent(portfolio.avg_bid_margin),
             sub: 'Portfolio target',
             icon: TrendingDown,
             color: 'text-blue-400',
@@ -87,8 +92,8 @@ export function Tab1Executive() {
           },
           {
             label: 'Avg Realized Margin',
-            value: formatPercent(PORTFOLIO_SUMMARY.avgRealizedMargin),
-            sub: `${formatPercent((PORTFOLIO_SUMMARY.avgBidMargin - PORTFOLIO_SUMMARY.avgRealizedMargin))} below bid`,
+            value: formatPercent(portfolio.avg_realized_margin),
+            sub: `${formatPercent((portfolio.avg_bid_margin - portfolio.avg_realized_margin))} below bid`,
             icon: TrendingDown,
             color: 'text-red-400',
             bg: 'bg-red-500/10',
@@ -161,25 +166,27 @@ export function Tab1Executive() {
       </div>
 
       {/* Billing vs Cost line chart */}
-      <div className="rounded-2xl border border-border/50 p-6" style={{ background: 'rgba(255,255,255,0.03)' }}>
-        <div className="mb-4">
-          <h3 className="text-foreground font-semibold">Portfolio Cash Flow Health</h3>
-          <p className="text-muted-foreground text-xs mt-0.5">Total billing vs total actual costs across all flagged projects. Gap below the line = cash flow pressure.</p>
+      {allBillingData.length > 0 && (
+        <div className="rounded-2xl border border-border/50 p-6" style={{ background: 'rgba(255,255,255,0.03)' }}>
+          <div className="mb-4">
+            <h3 className="text-foreground font-semibold">Portfolio Cash Flow Health</h3>
+            <p className="text-muted-foreground text-xs mt-0.5">Billing vs cumulative costs. Gap below the line = cash flow pressure.</p>
+          </div>
+          <div style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={allBillingData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
+                <XAxis dataKey="period" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomLineTip />} />
+                <Legend wrapperStyle={{ fontSize: '12px', color: '#64748b' }} />
+                <Line type="monotone" dataKey="billed" name="Period Billed" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="cost" name="Cumulative Billed" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div style={{ height: 220 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={allBillingData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
-              <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomLineTip />} />
-              <Legend wrapperStyle={{ fontSize: '12px', color: '#64748b' }} />
-              <Line type="monotone" dataKey="billed" name="Total Billed" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="cost" name="Actual Cost" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

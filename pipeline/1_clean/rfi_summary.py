@@ -1,7 +1,11 @@
 import duckdb
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from constants import RFI_LEVEL_HIGH_THRESHOLD, RFI_LEVEL_MEDIUM_THRESHOLD
 RFI_FILE = ROOT / "hvac_data" / "rfis_all.csv"
 CHANGE_FILE = ROOT / "hvac_data" / "change_orders_all.csv"
 OUTPUT_FILE = ROOT / "output_summaries" / "rfi_summary.csv"
@@ -43,8 +47,8 @@ COPY (
         r.total_rfis,
         COALESCE(l.rfis_linked_to_cos, 0) AS rfis_linked_to_cos,
         CASE
-            WHEN r.total_rfis > 50 THEN 'HIGH'
-            WHEN r.total_rfis > 20 THEN 'MEDIUM'
+            WHEN r.total_rfis > {RFI_LEVEL_HIGH_THRESHOLD} THEN 'HIGH'
+            WHEN r.total_rfis > {RFI_LEVEL_MEDIUM_THRESHOLD} THEN 'MEDIUM'
             ELSE 'LOW'
         END AS rfi_level,
         CASE

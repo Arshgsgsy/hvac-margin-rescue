@@ -1,6 +1,19 @@
 import duckdb
 import json
 from pathlib import Path
+from constants import (
+    SEVERITY_CRITICAL_THRESHOLD,
+    SEVERITY_WARNING_THRESHOLD,
+    SEVERITY_WATCH_THRESHOLD,
+    MATERIAL_OVERRUN_THRESHOLD,
+    LABOR_OVERRUN_THRESHOLD,
+    COMPOUND_MATERIAL_OVERRUN,
+    REJECTED_CO_EXPOSURE_THRESHOLD,
+    BUDGET_COVERAGE_MIN,
+    BUDGET_COVERAGE_MAX,
+    RFI_COST_IMPACT_COUNT_THRESHOLD,
+    RFI_COST_IMPACT_RATE_THRESHOLD,
+)
 
 OUTPUT_DIR = Path("output_summaries")
 
@@ -15,24 +28,24 @@ SELECT * FROM read_csv_auto('output_summaries/project_health.csv', header=True)
 # ════════════════════════════════════════════════════════���═════════════════
 # FLAG PROJECTS (any trigger fires → flagged)
 # ═══════════════════════════════════════════���══════════════════════════════
-flagged = con.execute("""
+flagged = con.execute(f"""
 SELECT *,
     CASE
-        WHEN realized_margin_pct < -0.10 THEN 'Critical'
-        WHEN realized_margin_pct < 0.00  THEN 'Warning'
-        WHEN realized_margin_pct < 0.10  THEN 'Watch'
+        WHEN realized_margin_pct < {SEVERITY_CRITICAL_THRESHOLD} THEN 'Critical'
+        WHEN realized_margin_pct < {SEVERITY_WARNING_THRESHOLD}  THEN 'Warning'
+        WHEN realized_margin_pct < {SEVERITY_WATCH_THRESHOLD}  THEN 'Watch'
         ELSE 'OK'
     END AS severity
 FROM project_health
 WHERE
     actual_tracked_cost > adjusted_contract                          -- 1: underwater
-    OR material_overrun_pct > 150                                    -- 2: material blowout
-    OR labor_overrun_pct > 50                                        -- 3: labor overrun
-    OR (co_rejected_value > original_contract_value * 0.05 AND realized_margin_pct < 0.10)  -- 4: rejected CO exposure on low-margin
-    OR budget_coverage < 0.88 OR budget_coverage > 1.10              -- 5: budget coverage outside 88-110%
-    OR (labor_overrun_pct > 0 AND material_overrun_pct > 100)        -- 6: compound overrun
-    OR rfi_cost_impact_count > 25                                    -- 7a: high cost-impact RFI count
-    OR (rfi_cost_impact_count * 1.0 / NULLIF(rfi_count, 0)) > 0.35  -- 7b: high cost-impact RFI rate
+    OR material_overrun_pct > {MATERIAL_OVERRUN_THRESHOLD * 100}     -- 2: material blowout
+    OR labor_overrun_pct > {LABOR_OVERRUN_THRESHOLD * 100}           -- 3: labor overrun
+    OR (co_rejected_value > original_contract_value * {REJECTED_CO_EXPOSURE_THRESHOLD} AND realized_margin_pct < {SEVERITY_WATCH_THRESHOLD})  -- 4: rejected CO exposure on low-margin
+    OR budget_coverage < {BUDGET_COVERAGE_MIN} OR budget_coverage > {BUDGET_COVERAGE_MAX}  -- 5: budget coverage outside healthy range
+    OR (labor_overrun_pct > 0 AND material_overrun_pct > {COMPOUND_MATERIAL_OVERRUN * 100})  -- 6: compound overrun
+    OR rfi_cost_impact_count > {RFI_COST_IMPACT_COUNT_THRESHOLD}     -- 7a: high cost-impact RFI count
+    OR (rfi_cost_impact_count * 1.0 / NULLIF(rfi_count, 0)) > {RFI_COST_IMPACT_RATE_THRESHOLD}  -- 7b: high cost-impact RFI rate
 ORDER BY realized_margin_dollars ASC
 """).fetchdf()
 
