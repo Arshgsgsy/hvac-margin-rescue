@@ -33,9 +33,9 @@ from constants import (
 )
 
 try:
-    from anthropic import Anthropic
+    from openai import OpenAI
 except ImportError:
-    Anthropic = None
+    OpenAI = None
 
 # Paths
 OUTPUT_DIR = PROJECT_ROOT / "output_summaries"
@@ -121,8 +121,8 @@ def build_portfolio_input(
 
         total_theoretical_recovery += analysis.get("total_recoverable_estimate") or 0
 
-        # Get retention from recoverability_summary if available
-        recov = analysis.get("recoverability_summary", {})
+        # Get retention from recoverability_assessment if available
+        recov = analysis.get("recoverability_assessment", {})
         total_retention += recov.get("retention_amount") or 0
 
     # Get totals from flagged projects
@@ -172,7 +172,10 @@ def build_portfolio_input(
                 "urgency": action.get("urgency", "this_month"),
                 "effort": action.get("effort"),
                 "time_to_cash_days": action.get("time_to_cash_days"),
-                "confidence": analysis.get("confidence", 0.7),
+                "confidence": action.get("probability_of_success") or analysis.get("confidence", 0.7),
+                "cost_to_execute_hours": action.get("cost_to_execute_hours"),
+                "expected_value": action.get("expected_value"),
+                "recovery_type": action.get("recovery_type"),
                 "linked_root_cause": action.get("linked_root_cause"),
                 "original_priority": action.get("priority", 0),
             })
@@ -340,10 +343,10 @@ def call_portfolio_optimization_agent(portfolio_input: dict) -> dict:
     Returns:
         Portfolio optimization output
     """
-    if Anthropic is None:
-        raise ImportError("anthropic package not installed")
+    if OpenAI is None:
+        raise ImportError("openai package not installed")
 
-    client = Anthropic()
+    client = OpenAI()
     prompt = load_prompt()
 
     # Limit actions to top 50 by expected value to stay within context
@@ -367,31 +370,28 @@ def call_portfolio_optimization_agent(portfolio_input: dict) -> dict:
         "_note": f"Showing top 50 of {len(actions)} total actions by expected value"
     }
 
-    response = client.messages.create(
+    response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
         max_tokens=LLM_MAX_TOKENS_PORTFOLIO,
-        system=prompt,
-        messages=[{
-            "role": "user",
-            "content": f"""Optimize this portfolio and return ONLY a JSON object.
+        messages=[
+            {"role": "system", "content": prompt},
+            {
+                "role": "user",
+                "content": f"""Optimize this portfolio and return ONLY a JSON object.
 
 PORTFOLIO INPUT:
 {json.dumps(compressed_input, indent=2)}
 """
-        }]
+            }
+        ]
     )
 
-    text_blocks = [
-        block.text
-        for block in response.content
-        if getattr(block, "type", None) == "text" and getattr(block, "text", "")
-    ]
-    response_text = "\n".join(text_blocks).strip()
+    response_text = response.choices[0].message.content or ""
 
     if not response_text:
         raise RuntimeError("Portfolio optimization returned an empty response.")
 
-    if getattr(response, "stop_reason", None) == "max_tokens":
+    if response.choices[0].finish_reason == "length":
         raise RuntimeError(
             "Portfolio optimization hit the max_tokens limit before finishing the JSON response."
         )

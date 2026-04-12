@@ -186,54 +186,66 @@ def build_hybrid_project_packet(project_id: str) -> dict | None:
     change_orders = get_change_orders(project_id)
     rfis = get_rfis(project_id)
 
-    # Build the hybrid packet
+    # Compute approved/pending/rejected CO counts and values from details
+    approved_cos = [co for co in change_orders if str(co.get("status", "")).lower() == "approved"]
+    pending_cos = [co for co in change_orders if str(co.get("status", "")).lower() == "pending"]
+    rejected_cos = [co for co in change_orders if str(co.get("status", "")).lower() == "rejected"]
+
+    # Build the hybrid packet aligned with the diagnosis agent's expected input
     return {
         "project": {
             "project_id": summary["project_id"],
             "project_name": summary["project_name"],
-            "gc_name": summary["gc_name"],
+            "customer": summary["gc_name"],
             "risk_level": summary["risk_level"],
             "severity": summary["severity"],
         },
-        "alert_provenance": {
+        "financials": {
+            "realized_margin_pct": summary["realized_margin_pct"],
+            "cost_vs_budget": summary["cost_vs_budget"],
+            "labor_burn_ratio": summary["labor_burn_ratio"],
+            "labor_avg_pct_overrun": summary["labor_avg_pct_overrun"],
+            "material_avg_pct_overrun": summary["material_avg_pct_overrun"],
+        },
+        "billing": {
+            "billing_gap_pct": summary["billing_gap_pct"],
+        },
+        "change_orders": {
+            "approved_co_pct": summary["approved_co_pct"],
+            "rejected_co_pct": summary["rejected_co_pct"],
+            "pending_co_pct": summary.get("pending_co_pct"),
+            "approved_count": len(approved_cos),
+            "approved_value": sum(co.get("amount", 0) or 0 for co in approved_cos),
+            "pending_count": len(pending_cos),
+            "pending_value": sum(co.get("amount", 0) or 0 for co in pending_cos),
+            "rejected_count": len(rejected_cos),
+            "rejected_value": sum(co.get("amount", 0) or 0 for co in rejected_cos),
+            "details": change_orders,
+        },
+        "operations": {
+            "overtime_spike": summary.get("overtime_spike"),
+            "burn_rate_acceleration": summary.get("burn_rate_acceleration"),
+            "crew_size_spike": summary.get("crew_size_spike"),
+            "forecast_to_complete_trend": summary.get("forecast_to_complete_trend"),
+        },
+        "text_evidence": {
+            "field_notes_count": len(field_notes),
+            "field_notes": field_notes,
+            "rfi_count": summary["total_rfis"],
+            "max_open_rfi_age": summary.get("max_open_rfi_age"),
+            "rfis": rfis,
+        },
+        "diagnostic_signals": {
             "alert_class": summary.get("alert_class"),
             "trigger_score": summary.get("trigger_score"),
             "primary_trigger": summary.get("primary_trigger"),
             "supporting_triggers": summary.get("supporting_triggers"),
             "fired_triggers": summary.get("fired_triggers"),
             "why_now": summary.get("why_now"),
-        },
-        "pre_computed_metrics": {
             "main_issue": summary["main_issue"],
             "management_cause": summary["management_cause"],
             "evidence": summary["evidence"],
             "recommended_action": summary["recommended_action"],
-            "realized_margin_pct": summary["realized_margin_pct"],
-            "cost_vs_budget": summary["cost_vs_budget"],
-            "billing_gap_pct": summary["billing_gap_pct"],
-            "pending_co_pct": summary.get("pending_co_pct"),
-            "max_open_rfi_age": summary.get("max_open_rfi_age"),
-            "labor_burn_ratio": summary["labor_burn_ratio"],
-            "labor_avg_pct_overrun": summary["labor_avg_pct_overrun"],
-            "material_avg_pct_overrun": summary["material_avg_pct_overrun"],
-            "overtime_spike": summary.get("overtime_spike"),
-            "burn_rate_acceleration": summary.get("burn_rate_acceleration"),
-            "crew_size_spike": summary.get("crew_size_spike"),
-            "forecast_to_complete_trend": summary.get("forecast_to_complete_trend"),
-        },
-        "change_orders": {
-            "approved_co_pct": summary["approved_co_pct"],
-            "rejected_co_pct": summary["rejected_co_pct"],
-            "pending_co_pct": summary.get("pending_co_pct"),
-            "details": change_orders,
-        },
-        "rfis": {
-            "total_count": summary["total_rfis"],
-            "details": rfis,
-        },
-        "field_notes": {
-            "total_count": len(field_notes),
-            "notes": field_notes,  # ALL field notes included
         },
     }
 

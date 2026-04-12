@@ -126,11 +126,11 @@ TOP_COST_CODES_LIMIT = 5         # Number of top cost codes to include
 # ─────────────────────────────────────────────────────────────────────────────────
 # LLM CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────────────
-LLM_MODEL_CHAT = "claude-opus-4-6"       # Opus for chat
-LLM_MODEL_ANALYSIS = "claude-opus-4-6"   # Opus for analysis
+LLM_MODEL_CHAT = "gpt-5.4"       # GPT-5.4 for chat
+LLM_MODEL_ANALYSIS = "gpt-5.4"   # GPT-5.4 for analysis
 LLM_MAX_TOKENS_CHAT = 1024
 LLM_MAX_TOKENS_ANALYSIS = 2000
-LLM_MAX_TOKENS_PORTFOLIO = 4000  # Larger output for portfolio optimization
+LLM_MAX_TOKENS_PORTFOLIO = 6000  # Larger output for portfolio optimization
 
 # ─────────────────────────────────────────────────────────────────────────────────
 # PORTFOLIO OPTIMIZATION

@@ -293,39 +293,57 @@ def build_hybrid_packet_local(project_id: str) -> dict | None:
                 "status": rfi_row["status"],
             })
 
-    # Build hybrid packet
+    # Compute approved/pending/rejected CO counts and values from details
+    approved_cos = [co for co in change_orders if str(co.get("status", "")).lower() == "approved"]
+    pending_cos = [co for co in change_orders if str(co.get("status", "")).lower() == "pending"]
+    rejected_cos = [co for co in change_orders if str(co.get("status", "")).lower() == "rejected"]
+
+    # Build hybrid packet aligned with the diagnosis agent's expected input
     return {
         "project": {
             "project_id": row["project_id"],
             "project_name": row["project_name"],
-            "gc_name": row["gc_name"],
+            "customer": row["gc_name"],
             "risk_level": row["risk_level"],
             "severity": row["severity"],
         },
-        "pre_computed_metrics": {
-            "main_issue": row["main_issue"],
-            "management_cause": row["management_cause"],
-            "evidence": row["evidence"],
-            "recommended_action": row["recommended_action"],
+        "financials": {
             "realized_margin_pct": row["realized_margin_pct"],
             "cost_vs_budget": row["cost_vs_budget"],
-            "billing_gap_pct": row["billing_gap_pct"],
             "labor_burn_ratio": row["labor_burn_ratio"],
             "labor_avg_pct_overrun": row["labor_avg_pct_overrun"],
             "material_avg_pct_overrun": row["material_avg_pct_overrun"],
         },
+        "billing": {
+            "billing_gap_pct": row["billing_gap_pct"],
+        },
         "change_orders": {
             "approved_co_pct": row["approved_co_pct"],
             "rejected_co_pct": row["rejected_co_pct"],
+            "approved_count": len(approved_cos),
+            "approved_value": sum(co.get("amount", 0) or 0 for co in approved_cos),
+            "pending_count": len(pending_cos),
+            "pending_value": sum(co.get("amount", 0) or 0 for co in pending_cos),
+            "rejected_count": len(rejected_cos),
+            "rejected_value": sum(co.get("amount", 0) or 0 for co in rejected_cos),
             "details": change_orders,
         },
-        "rfis": {
-            "total_count": int(row["total_rfis"]),
-            "details": rfis,
+        "operations": {
+            "overtime_spike": row.get("overtime_spike"),
+            "burn_rate_acceleration": row.get("burn_rate_acceleration"),
+            "crew_size_spike": row.get("crew_size_spike"),
         },
-        "field_notes": {
-            "total_count": len(field_notes),
-            "notes": field_notes,  # ALL field notes included
+        "text_evidence": {
+            "field_notes_count": len(field_notes),
+            "field_notes": field_notes,
+            "rfi_count": int(row["total_rfis"]),
+            "rfis": rfis,
+        },
+        "diagnostic_signals": {
+            "main_issue": row["main_issue"],
+            "management_cause": row["management_cause"],
+            "evidence": row["evidence"],
+            "recommended_action": row["recommended_action"],
         },
     }
 

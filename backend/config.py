@@ -20,7 +20,7 @@ PIPELINE_DIR = PROJECT_ROOT / "pipeline"
 PIPELINE_OUTPUT_DIR = PIPELINE_DIR / "output"
 HVAC_DATA_LINK = PROJECT_ROOT / "hvac_data"
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # Required files - pipeline cannot run without these
 REQUIRED_CSV_FILES = [

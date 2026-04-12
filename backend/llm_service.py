@@ -6,8 +6,8 @@ from pathlib import Path
 # Add project root to path for constants import
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import anthropic
-from config import ANTHROPIC_API_KEY
+import openai
+from config import OPENAI_API_KEY
 from data_transformer import load_single_project
 from prompts import (
     SYSTEM_PROMPT,
@@ -23,33 +23,38 @@ from constants import (
     LLM_MODEL_ANALYSIS,
     LLM_MAX_TOKENS_CHAT,
     LLM_MAX_TOKENS_ANALYSIS,
+    LLM_MAX_TOKENS_PORTFOLIO,
 )
 from async_llm_client import get_async_client, extract_json_from_response
 
 
 def _require_api_key():
-    if not ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY is not configured.")
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not configured.")
 
 
 def stream_chat(project: dict, question: str):
-    """Generator that yields text chunks from Claude for a project chat."""
+    """Generator that yields text chunks from OpenAI for a project chat."""
     _require_api_key()
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
     context = build_project_context(project)
     prompt = root_cause_prompt(context, question)
 
     try:
-        with client.messages.stream(
+        stream = client.chat.completions.create(
             model=LLM_MODEL_CHAT,
             max_tokens=LLM_MAX_TOKENS_CHAT,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            for text in stream.text_stream:
-                yield text
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            stream=True,
+        )
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
     except Exception as exc:
-        yield f"\n[ERROR] Claude chat stream failed: {exc}"
+        yield f"\n[ERROR] OpenAI chat stream failed: {exc}"
 
 
 def _extract_json_from_response(text: str) -> dict:
@@ -82,7 +87,7 @@ async def run_diagnosis(project_packet: dict) -> dict:
         }]
     )
 
-    return extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.choices[0].message.content)
 
 
 async def run_recommendations(diagnosis: dict, packet: dict) -> dict:
@@ -107,7 +112,7 @@ PROJECT PACKET:
         }]
     )
 
-    return extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.choices[0].message.content)
 
 
 async def analyze_project(project: dict) -> dict:
@@ -127,33 +132,36 @@ async def analyze_project(project: dict) -> dict:
 def run_diagnosis_sync(project_packet: dict) -> dict:
     """Run diagnosis agent on a project (sync version)"""
     _require_api_key()
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-    response = client.messages.create(
+    response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
         max_tokens=LLM_MAX_TOKENS_ANALYSIS,
-        system=DIAGNOSIS_SYSTEM_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"Analyze this project and return ONLY a JSON object:\n\n{json.dumps(project_packet, indent=2)}"
-        }]
+        messages=[
+            {"role": "system", "content": DIAGNOSIS_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"Analyze this project and return ONLY a JSON object:\n\n{json.dumps(project_packet, indent=2)}"
+            }
+        ]
     )
 
-    return _extract_json_from_response(response.content[0].text)
+    return _extract_json_from_response(response.choices[0].message.content)
 
 
 def run_recommendations_sync(diagnosis: dict, packet: dict) -> dict:
     """Run recommendation agent on diagnosis + packet (sync version)"""
     _require_api_key()
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-    response = client.messages.create(
+    response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
         max_tokens=LLM_MAX_TOKENS_ANALYSIS,
-        system=RECOMMENDATION_SYSTEM_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"""Generate recovery recommendations and return ONLY a JSON object.
+        messages=[
+            {"role": "system", "content": RECOMMENDATION_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"""Generate recovery recommendations and return ONLY a JSON object.
 
 DIAGNOSIS:
 {json.dumps(diagnosis, indent=2)}
@@ -161,10 +169,11 @@ DIAGNOSIS:
 PROJECT PACKET:
 {json.dumps(packet, indent=2)}
 """
-        }]
+            }
+        ]
     )
 
-    return _extract_json_from_response(response.content[0].text)
+    return _extract_json_from_response(response.choices[0].message.content)
 
 
 def analyze_project_sync(project: dict) -> dict:
@@ -260,19 +269,21 @@ PORTFOLIO_OPTIMIZATION_PROMPT = _load_portfolio_prompt()
 def run_portfolio_optimization_sync(portfolio_input: dict) -> dict:
     """Run portfolio optimization agent (sync version)"""
     _require_api_key()
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-    response = client.messages.create(
+    response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=4000,  # Larger output for portfolio
-        system=PORTFOLIO_OPTIMIZATION_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"Optimize this portfolio and return ONLY a JSON object:\n\n{json.dumps(portfolio_input, indent=2)}"
-        }]
+        max_tokens=LLM_MAX_TOKENS_PORTFOLIO,
+        messages=[
+            {"role": "system", "content": PORTFOLIO_OPTIMIZATION_PROMPT},
+            {
+                "role": "user",
+                "content": f"Optimize this portfolio and return ONLY a JSON object:\n\n{json.dumps(portfolio_input, indent=2)}"
+            }
+        ]
     )
 
-    return _extract_json_from_response(response.content[0].text)
+    return _extract_json_from_response(response.choices[0].message.content)
 
 
 async def run_portfolio_optimization(portfolio_input: dict) -> dict:
@@ -282,7 +293,7 @@ async def run_portfolio_optimization(portfolio_input: dict) -> dict:
 
     response = await client.create_message(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=4000,
+        max_tokens=LLM_MAX_TOKENS_PORTFOLIO,
         system=PORTFOLIO_OPTIMIZATION_PROMPT,
         messages=[{
             "role": "user",
@@ -290,4 +301,4 @@ async def run_portfolio_optimization(portfolio_input: dict) -> dict:
         }]
     )
 
-    return extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.choices[0].message.content)

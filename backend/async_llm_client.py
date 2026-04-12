@@ -2,7 +2,7 @@
 Async LLM Client - Singleton client with rate limiting and retry logic.
 
 Features:
-- Connection pooling: Single AsyncAnthropic instance reused
+- Connection pooling: Single AsyncOpenAI instance reused
 - Rate limiting: asyncio.Semaphore for concurrent call limiting
 - Retry logic: Exponential backoff for rate limits, connection errors, 5xx errors
 - Stats tracking: Call count, error count, timing
@@ -15,14 +15,14 @@ import re
 import time
 from typing import Any
 
-import anthropic
-from anthropic import AsyncAnthropic, RateLimitError, APIConnectionError, APIStatusError
+import openai
+from openai import AsyncOpenAI, RateLimitError, APIConnectionError, APIStatusError
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import ANTHROPIC_API_KEY
+from config import OPENAI_API_KEY
 from constants import (
     MAX_CONCURRENT_API_CALLS,
     RETRY_MAX_ATTEMPTS,
@@ -39,10 +39,10 @@ class AsyncLLMClient:
     _lock: asyncio.Lock | None = None
 
     def __init__(self):
-        if not ANTHROPIC_API_KEY:
-            raise RuntimeError("ANTHROPIC_API_KEY is not configured.")
+        if not OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is not configured.")
 
-        self._client = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        self._client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_API_CALLS)
 
         # Stats tracking
@@ -82,7 +82,7 @@ class AsyncLLMClient:
         max_tokens: int,
         system: str,
         messages: list[dict[str, Any]],
-    ) -> anthropic.types.Message:
+    ) -> openai.types.chat.ChatCompletion:
         """
         Create a message with rate limiting and retry logic.
 
@@ -112,19 +112,21 @@ class AsyncLLMClient:
         max_tokens: int,
         system: str,
         messages: list[dict[str, Any]],
-    ) -> anthropic.types.Message:
+    ) -> openai.types.chat.ChatCompletion:
         """Internal method with retry logic."""
         last_error: Exception | None = None
+
+        # Prepend system message to messages list
+        full_messages = [{"role": "system", "content": system}] + messages
 
         for attempt in range(RETRY_MAX_ATTEMPTS):
             try:
                 start_time = time.monotonic()
 
-                response = await self._client.messages.create(
+                response = await self._client.chat.completions.create(
                     model=model,
                     max_tokens=max_tokens,
-                    system=system,
-                    messages=messages,
+                    messages=full_messages,
                 )
 
                 # Track stats
