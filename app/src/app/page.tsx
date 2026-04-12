@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { UploadPage } from '@/components/upload-page'
 import { Tab1Executive } from '@/components/tabs/tab1-executive'
 import { Tab2SOV } from '@/components/tabs/tab2-sov'
 import { Tab3LaborMaterial } from '@/components/tabs/tab3-labor-material'
@@ -18,9 +19,16 @@ const TABS = [
 ]
 
 export default function Home() {
+  const [showDashboard, setShowDashboard] = useState(false)
   const [activeTab, setActiveTab] = useState('pipeline')
   const erosion = PORTFOLIO_SUMMARY.avgBidMargin - PORTFOLIO_SUMMARY.avgRealizedMargin
 
+  // Show upload page first
+  if (!showDashboard) {
+    return <UploadPage onProceed={() => setShowDashboard(true)} />
+  }
+
+  // After upload, show the dashboard
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top bar */}
