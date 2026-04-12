@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, TrendingUp, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar, Clock, ChevronDown } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar } from 'lucide-react'
 import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
 import { Project } from '@/lib/types'
 import { InvestigateModal } from './investigate-modal'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid } from 'recharts'
+
 
 interface UploadedFile {
   name: string
@@ -311,26 +311,7 @@ export function UploadPage() {
   }, 0)
   const avgMarginErosion = MOCK_PROJECTS.reduce((sum, p) => sum + Math.abs(p.marginDelta), 0) / MOCK_PROJECTS.length
 
-  // Chart data
-  const severityChartData = [
-    { name: 'Critical', value: criticalProjects.length, color: '#ef4444' },
-    { name: 'Elevated', value: warningProjects.length, color: '#f97316' },
-    { name: 'Monitor', value: watchProjects.length, color: '#eab308' },
-  ]
 
-  const overrunByCategory = [
-    { category: 'Labor', amount: MOCK_PROJECTS.reduce((s, p) => s + p.laborOverrun, 0) },
-    { category: 'Material', amount: MOCK_PROJECTS.reduce((s, p) => s + p.materialOverrun, 0) },
-  ]
-
-  const monthlyTrendData = [
-    { month: 'Jan', overrun: 180000, recovered: 45000 },
-    { month: 'Feb', overrun: 220000, recovered: 80000 },
-    { month: 'Mar', overrun: 310000, recovered: 120000 },
-    { month: 'Apr', overrun: 280000, recovered: 95000 },
-    { month: 'May', overrun: 350000, recovered: 180000 },
-    { month: 'Jun', overrun: 420000, recovered: 210000 },
-  ]
 
   // Render project row
   const renderProjectRow = (project: Project) => (
@@ -750,29 +731,6 @@ export function UploadPage() {
                 </div>
               </div>
 
-              {/* Biggest problem callout */}
-              <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-destructive/20 flex items-center justify-center flex-shrink-0">
-                    <AlertCircle className="w-6 h-6 text-destructive" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-foreground">Biggest Issue: {criticalProjects[0]?.name}</h3>
-                    <p className="text-muted-foreground mt-1">{criticalProjects[0]?.rootCause}</p>
-                    <div className="flex gap-4 mt-3">
-                      <div>
-                        <span className="text-sm text-muted-foreground">Margin Erosion: </span>
-                        <span className="font-bold text-destructive">-{formatPercent(Math.abs(criticalProjects[0]?.marginDelta || 0))}</span>
-                      </div>
-                      <div>
-                        <span className="text-sm text-muted-foreground">Total Overrun: </span>
-                        <span className="font-bold text-foreground">{formatCurrency((criticalProjects[0]?.laborOverrun || 0) + (criticalProjects[0]?.materialOverrun || 0))}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Company Performance Metrics with Time Filter */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between flex-wrap gap-4">
@@ -904,109 +862,40 @@ export function UploadPage() {
                   </div>
                 </div>
 
-                {/* Performance Indicator Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <TrendingUp className="w-4 h-4 text-emerald-500" />
-                      </div>
-                      <span className="text-sm text-muted-foreground">Avg Profit Margin</span>
-                    </div>
-                    <div className="text-2xl font-bold text-foreground">12.4%</div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-emerald-500">+2.1%</span>
-                      <span className="text-xs text-muted-foreground">vs last period</span>
-                    </div>
-                  </div>
+              </div>
 
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <BarChart3 className="w-4 h-4 text-primary" />
-                      </div>
-                      <span className="text-sm text-muted-foreground">Revenue</span>
-                    </div>
-                    <div className="text-2xl font-bold text-foreground">$47.2M</div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-emerald-500">+8.5%</span>
-                      <span className="text-xs text-muted-foreground">YoY growth</span>
-                    </div>
+              {/* Biggest problem callout - moved here before projects by severity */}
+              <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-6 h-6 text-destructive" />
                   </div>
-
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                        <Clock className="w-4 h-4 text-orange-500" />
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-foreground">Biggest Issue: {criticalProjects[0]?.name}</h3>
+                    <p className="text-muted-foreground mt-1">{criticalProjects[0]?.rootCause}</p>
+                    <div className="flex gap-4 mt-3">
+                      <div>
+                        <span className="text-sm text-muted-foreground">Margin Erosion: </span>
+                        <span className="font-bold text-destructive">-{formatPercent(Math.abs(criticalProjects[0]?.marginDelta || 0))}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">Avg Days to Close</span>
-                    </div>
-                    <div className="text-2xl font-bold text-foreground">127</div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-destructive">+12 days</span>
-                      <span className="text-xs text-muted-foreground">vs target</span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-                        <AlertTriangle className="w-4 h-4 text-destructive" />
+                      <div>
+                        <span className="text-sm text-muted-foreground">Total Overrun: </span>
+                        <span className="font-bold text-foreground">{formatCurrency((criticalProjects[0]?.laborOverrun || 0) + (criticalProjects[0]?.materialOverrun || 0))}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">Cost Variance</span>
                     </div>
-                    <div className="text-2xl font-bold text-destructive">-4.7%</div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-muted-foreground">Avg budget overrun</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Monthly Trend Line Chart - Full Width with Time Filter */}
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <h4 className="font-semibold text-foreground mb-2">Monthly Overrun vs Recovery Trend</h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Track how cost overruns and successful recoveries trend over time. A widening gap indicates growing exposure, while convergence shows effective cost control measures taking effect.
-                  </p>
-                  <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={monthlyTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="month" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                        <YAxis 
-                          tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                          tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                        />
-                        <Tooltip 
-                          formatter={(value: number) => [formatCurrency(value)]}
-                          contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                        />
-                        <Legend />
-                        <Line 
-                          type="monotone" 
-                          dataKey="overrun" 
-                          stroke="#ef4444" 
-                          strokeWidth={2}
-                          name="Overrun"
-                          dot={{ fill: '#ef4444' }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="recovered" 
-                          stroke="#10b981" 
-                          strokeWidth={2}
-                          name="Recovered"
-                          dot={{ fill: '#10b981' }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>
 
               {/* General Recommendations Section */}
               <div className="space-y-4">
-                <h3 className="text-xl font-bold text-foreground">General Recommendations</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-foreground">General Recommendations</h3>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium text-primary">AI-Powered Insights</span>
+                  </div>
+                </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Supply Chain / Logistics Issue */}
@@ -1016,14 +905,14 @@ export function UploadPage() {
                         <Truck className="w-5 h-5 text-orange-500" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-foreground">Supply Chain & Delivery Issues Detected</h4>
+                        <h4 className="font-semibold text-foreground">Supply Chain & Delivery Issues</h4>
                         <p className="text-sm text-muted-foreground mt-1">
-                          3 of 8 flagged projects show significant delays and cost overruns related to material delivery and supplier coordination.
+                          <span className="font-semibold text-orange-500">5 of 8 flagged projects</span> (Riverside Medical, Greenfield Office, Harbor Logistics, Tech Campus, Municipal Library) share this root cause pattern.
                         </p>
                         <div className="mt-3 p-3 rounded-lg bg-background/50 border border-border">
                           <p className="text-sm font-medium text-foreground">Recommended Action:</p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Schedule a meeting with the logistics and procurement team to review supplier contracts, delivery SLAs, and implement better tracking mechanisms.
+                            Schedule a meeting with the logistics and procurement team to review supplier contracts, delivery SLAs, and implement better tracking mechanisms. Consider centralizing vendor management.
                           </p>
                         </div>
                       </div>
@@ -1037,17 +926,59 @@ export function UploadPage() {
                         <Users className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-foreground">GC Coordination Failures Pattern</h4>
+                        <h4 className="font-semibold text-foreground">GC Coordination Failures</h4>
                         <p className="text-sm text-muted-foreground mt-1">
-                          4 of 8 flagged projects indicate general contractor coordination issues leading to rework and scheduling conflicts.
+                          <span className="font-semibold text-primary">4 of 8 flagged projects</span> (Lakeview Schools, Sunset Senior, Downtown Hotel, Harbor Logistics) show GC coordination issues causing rework.
                         </p>
                         <div className="mt-3 p-3 rounded-lg bg-background/50 border border-border">
                           <p className="text-sm font-medium text-foreground">Recommended Action:</p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Implement weekly coordination meetings with GCs on all active projects. Consider adding contract clauses for coordination accountability.
+                            Implement weekly coordination meetings with GCs on all active projects. Consider adding contract clauses for coordination accountability and penalties.
                           </p>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* LLM Analysis Output */}
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-foreground">AI Analysis Summary</h4>
+                      <p className="text-xs text-muted-foreground">Generated by Claude based on portfolio data</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-muted/30 border border-border p-4 font-mono text-sm text-foreground leading-relaxed overflow-auto max-h-80">
+                    <div className="prose prose-sm prose-invert max-w-none">
+                      <p className="font-semibold text-primary mb-3">Portfolio Risk Assessment</p>
+                      <p className="mb-3">After analyzing 47 projects totaling $62.8M in contract value, I identified <strong>8 projects with significant margin erosion</strong> requiring immediate attention.</p>
+                      
+                      <p className="font-semibold text-orange-500 mb-2">Key Findings:</p>
+                      <ul className="list-disc pl-5 mb-3 space-y-1">
+                        <li><strong>Primary Risk Pattern:</strong> Supply chain disruptions affecting 5 projects with combined exposure of $1.2M</li>
+                        <li><strong>Secondary Pattern:</strong> GC coordination failures on 4 projects causing $680K in rework costs</li>
+                        <li><strong>Billing Gap Alert:</strong> 3 projects show 15%+ gap between work completed and amounts billed</li>
+                        <li><strong>Overtime Exposure:</strong> 6 projects exceeding budgeted OT by 40%+ average</li>
+                      </ul>
+                      
+                      <p className="font-semibold text-emerald-500 mb-2">Recovery Opportunities:</p>
+                      <ul className="list-disc pl-5 mb-3 space-y-1">
+                        <li><strong>Change Order Claims:</strong> $2.1M in documented but unbilled change orders across 6 projects</li>
+                        <li><strong>Billing Acceleration:</strong> $1.8M recoverable through immediate billing of completed work</li>
+                        <li><strong>Contract Renegotiation:</strong> $1.0M potential through escalation clause enforcement</li>
+                      </ul>
+                      
+                      <p className="font-semibold text-destructive mb-2">Immediate Actions Required:</p>
+                      <ol className="list-decimal pl-5 space-y-1">
+                        <li>Schedule CFO review meeting for Riverside Medical ($1.02M exposure) - highest priority</li>
+                        <li>Initiate change order billing process for Greenfield Office and Lakeview Schools</li>
+                        <li>Convene logistics team meeting to address systemic supply chain issues</li>
+                        <li>Implement weekly GC coordination calls on all flagged projects</li>
+                      </ol>
                     </div>
                   </div>
                 </div>
