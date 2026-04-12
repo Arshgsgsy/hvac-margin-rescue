@@ -31,7 +31,11 @@
 
 @layer base {
   * { @apply border-border; box-sizing: border-box; }
-  body { @apply bg-background text-foreground; -webkit-font-smoothing: antialiased; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Avenir Next", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }

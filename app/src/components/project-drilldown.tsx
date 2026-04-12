@@ -29,6 +29,7 @@ const severityStyle: Record<string, { text: string; bg: string; border: string }
 
 export default function ProjectDrilldown({ project }: Props) {
   const cfg = severityStyle[project.severity] ?? severityStyle.watch
+  const billingDataAvailable = project.billing_data_available !== false
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -275,8 +276,14 @@ export default function ProjectDrilldown({ project }: Props) {
             <CostBreakdown project={project} />
             <div className="grid gap-3 mt-5 sm:grid-cols-3">
               <SupportMetric label="% Complete" value={formatPercent(project.billing_status.percent_complete)} />
-              <SupportMetric label="% Billed" value={formatPercent(project.billing_status.percent_billed)} />
-              <SupportMetric label="Billing Gap" value={formatCurrency(project.contract_value * project.billing_gap)} />
+              <SupportMetric
+                label="% Billed"
+                value={billingDataAvailable ? formatPercent(project.billing_status.percent_billed) : 'N/A'}
+              />
+              <SupportMetric
+                label="Billing Gap"
+                value={billingDataAvailable ? formatCurrency(project.contract_value * (project.billing_gap ?? 0)) : 'Unavailable'}
+              />
             </div>
           </div>
 

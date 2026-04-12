@@ -235,14 +235,15 @@ def _transform_project(raw: dict) -> dict:
     est_material = _coerce_number(raw.get("est_material"), 0)
     actual_material = _coerce_number(raw.get("actual_material_cost"), 0)
     contract = _coerce_number(raw.get("original_contract_value"), 0)
-    pct_billed = _coerce_number(raw.get("pct_billed"), 0)
+    billing_data_available = bool(raw.get("billing_data_available", False))
+    pct_billed = _nullable_number(raw.get("pct_billed")) if billing_data_available else None
     total_budget = _coerce_number(raw.get("total_budget"), 0)
     actual_tracked = _coerce_number(raw.get("actual_tracked_cost"), 0)
     pct_complete = _coerce_number(raw.get("pct_complete"), min(actual_tracked / total_budget, 1.0) if total_budget > 0 else 0)
     estimated_cost_total = est_labor + est_material
     actual_cost_total = actual_labor + actual_material
-    retention_held = contract * pct_billed * RETENTION_RATE if contract else 0
-    project_stage = _determine_stage(pct_billed)
+    retention_held = contract * pct_billed * RETENTION_RATE if contract and pct_billed is not None else 0
+    project_stage = _determine_stage(pct_billed if pct_billed is not None else pct_complete)
     primary_trigger = raw.get("primary_trigger") or {}
     supporting_triggers = raw.get("supporting_triggers") or []
     fired_triggers = raw.get("fired_triggers") or []
@@ -273,7 +274,12 @@ def _transform_project(raw: dict) -> dict:
         "project_stage": project_stage,
         "labor_overrun": actual_labor - est_labor,
         "material_overrun": actual_material - est_material,
-        "billing_gap": _coerce_number(raw.get("billing_gap_pct"), pct_complete - pct_billed),
+        "billing_data_available": billing_data_available,
+        "billing_gap": (
+            _nullable_number(raw.get("billing_gap_pct"))
+            if billing_data_available
+            else None
+        ),
         "retention_held": retention_held,
         "co_approved_value": _coerce_number(raw.get("co_approved_value"), 0),
         "co_pending_value": _coerce_number(raw.get("co_pending_value"), 0),
@@ -563,7 +569,11 @@ def _build_fallback_root_causes(project: dict) -> list[dict]:
     causes = []
     labor_overrun = max(0, project.get("labor_overrun", 0))
     material_overrun = max(0, project.get("material_overrun", 0))
-    billing_gap_dollars = max(0, project.get("contract_value", 0) * project.get("billing_gap", 0))
+    billing_gap_dollars = (
+        max(0, project.get("contract_value", 0) * _coerce_number(project.get("billing_gap"), 0))
+        if project.get("billing_data_available")
+        else 0
+    )
     commercial_gap = max(0, project.get("co_pending_value", 0) + project.get("co_rejected_value", 0))
 
     if labor_overrun > 0:
@@ -598,7 +608,7 @@ def _build_fallback_root_causes(project: dict) -> list[dict]:
             ),
         })
 
-    if billing_gap_dollars > 0:
+    if project.get("billing_data_available") and billing_gap_dollars > 0:
         causes.append({
             "label": "Underbilling / Cash Lag",
             "category": "billing",
@@ -638,7 +648,11 @@ def _build_fallback_root_causes(project: dict) -> list[dict]:
 def _build_fallback_actions(project: dict) -> list[dict]:
     actions = []
     contract_value = project.get("contract_value", 0)
-    billing_gap_dollars = max(0, contract_value * project.get("billing_gap", 0))
+    billing_gap_dollars = (
+        max(0, contract_value * _coerce_number(project.get("billing_gap"), 0))
+        if project.get("billing_data_available")
+        else 0
+    )
     retention_amount = max(0, project.get("retention_held", 0))
     pending_value = max(0, project.get("co_pending_value", 0))
     rejected_value = max(0, project.get("co_rejected_value", 0))
@@ -646,7 +660,7 @@ def _build_fallback_actions(project: dict) -> list[dict]:
     material_overrun = max(0, project.get("material_overrun", 0))
     stage = project.get("project_stage")
 
-    if billing_gap_dollars > 0:
+    if project.get("billing_data_available") and billing_gap_dollars > 0:
         actions.append(_normalize_recovery_action({
             "priority": 1,
             "action": (
@@ -695,7 +709,7 @@ def _build_fallback_actions(project: dict) -> list[dict]:
             "blocking_items": ["Backup documentation", "Executive signoff" if is_rejected else "Owner response"],
         }, 2, 0.6))
 
-    if retention_amount > 0 and stage in {"late", "complete"}:
+    if project.get("billing_data_available") and retention_amount > 0 and stage in {"late", "complete"}:
         actions.append(_normalize_recovery_action({
             "priority": 3,
             "action": "Prepare and submit retention release package.",
@@ -992,7 +1006,10 @@ def _build_portfolio_brief(projects: list[dict], optimization: dict | None) -> d
     biggest_blockers = []
     if any(project.get("co_rejected_value", 0) > 0 for project in projects):
         biggest_blockers.append("Executive escalation is needed on rejected commercial items.")
-    if any(project.get("billing_gap", 0) > 0.05 for project in projects):
+    if any(
+        project.get("billing_data_available") and _coerce_number(project.get("billing_gap"), 0) > 0.05
+        for project in projects
+    ):
         biggest_blockers.append("Cash is trapped behind percent-complete certification and invoice timing.")
     if not biggest_blockers:
         biggest_blockers.append("Project teams need a tighter owner-by-owner action cadence.")
@@ -1209,5 +1226,11 @@ def _enrich_project(project: dict, project_id: str):
             enriched_sources.append("field_notes")
 
     project["enriched_sources"] = enriched_sources
-    if project.get("retention_held", 0) == 0 and project.get("billing_status", {}).get("percent_billed", 0) >= BILLING_COMPLETE_THRESHOLD:
-        project["retention_held"] = project.get("contract_value", 0) * project["billing_status"]["percent_billed"] * RETENTION_RATE
+    billed_pct = project.get("billing_status", {}).get("percent_billed")
+    if (
+        project.get("billing_data_available")
+        and project.get("retention_held", 0) == 0
+        and billed_pct is not None
+        and billed_pct >= BILLING_COMPLETE_THRESHOLD
+    ):
+        project["retention_held"] = project.get("contract_value", 0) * billed_pct * RETENTION_RATE

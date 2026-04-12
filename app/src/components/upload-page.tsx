@@ -135,7 +135,7 @@ export function UploadPage() {
 
   // Pipeline state
   const [statuses, setStatuses] = useState<StepStatus[]>(STEPS.map(() => 'idle'))
-  const [visibleLogs, setVisibleLogs] = useState<string[][]>(STEPS.map(() => []))
+  const [visibleLogs, setVisibleLogs] = useState<string[][]>(STEPS.map((): string[] => []))
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
   const logRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -193,7 +193,7 @@ export function UploadPage() {
     setPipelineError(null)
     setPipelineResult(null)
     setStatuses(STEPS.map(() => 'idle'))
-    setVisibleLogs(STEPS.map(() => []))
+    setVisibleLogs(STEPS.map((): string[] => []))
   }
 
   const applyPipelineResult = useCallback((result: PipelineResult | null) => {
@@ -226,7 +226,7 @@ export function UploadPage() {
     setRunning(true)
     runningRef.current = true
     setStatuses(STEPS.map(() => 'idle'))
-    setVisibleLogs(STEPS.map(() => []))
+    setVisibleLogs(STEPS.map((): string[] => []))
     setFiles(selectedFiles.map((file) => ({
       name: file.name,
       size: file.size,
@@ -412,7 +412,7 @@ export function UploadPage() {
       </div>
       <div className="text-right flex-shrink-0">
         <div className="text-lg font-bold text-foreground">
-          {formatCurrency(project.laborOverrun + project.materialOverrun)}
+          {formatCurrency((project.laborOverrun ?? 0) + (project.materialOverrun ?? 0))}
         </div>
         <div className="text-xs text-muted-foreground">total overrun</div>
       </div>

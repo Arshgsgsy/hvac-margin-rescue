@@ -138,7 +138,7 @@ function ProjectRow({ project, onInvestigate }: ProjectRowProps) {
     watch: 'border-blue-500/30 bg-blue-500/5 hover:border-blue-500/50',
   }
 
-  const totalOverrun = project.laborOverrun + project.materialOverrun
+  const totalOverrun = (project.laborOverrun ?? 0) + (project.materialOverrun ?? 0)
 
   return (
     <div className={`rounded-xl border p-5 transition-all duration-200 ${severityColors[project.severity] ?? severityColors.watch}`}>

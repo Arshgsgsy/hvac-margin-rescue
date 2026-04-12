@@ -153,15 +153,15 @@ export interface Project {
   estimated_cost_total?: number
   actual_cost_total?: number
   retention_held?: number
-  labor_overrun: number
-  material_overrun: number
-  billing_gap: number
+  labor_overrun?: number
+  material_overrun?: number
+  billing_gap?: number
   co_approved_value?: number
   co_pending_value?: number
   co_rejected_value?: number
-  labor_cost: CostBreakdown
-  material_cost: CostBreakdown
-  billing_status: { percent_complete: number; percent_billed: number }
+  labor_cost?: CostBreakdown
+  material_cost?: CostBreakdown
+  billing_status?: { percent_complete: number; percent_billed: number }
   contractValue?: number
   bidMargin?: number
   realizedMargin?: number
@@ -196,18 +196,18 @@ export interface Project {
   do_not_pursue?: Array<string | { reason?: string; action?: string }>
   blocking_items?: string[]
   money_brief?: ProjectMoneyBrief | null
-  change_orders: ChangeOrder[]
+  change_orders?: ChangeOrder[]
   changeOrders?: ChangeOrder[]
-  rfis: RFI[]
-  sov_lines: SOVLine[]
+  rfis?: RFI[]
+  sov_lines?: SOVLine[]
   sovLines?: SOVLine[]
-  labor_by_week: LaborWeek[]
+  labor_by_week?: LaborWeek[]
   laborByWeek?: LaborWeek[]
-  material_deliveries: MaterialDelivery[]
+  material_deliveries?: MaterialDelivery[]
   materialDeliveries?: MaterialDelivery[]
-  billing_history: BillingPeriod[]
+  billing_history?: BillingPeriod[]
   billingHistory?: BillingPeriod[]
-  rfi_by_week: RFIWeek[]
+  rfi_by_week?: RFIWeek[]
   llm_financial_snapshot?: Record<string, any> | null
   recoverability_summary?: Record<string, any> | null
   recovery_actions_rich?: RecoveryActionRich[]

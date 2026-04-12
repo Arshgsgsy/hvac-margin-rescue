@@ -155,7 +155,7 @@ interface Props {
 
 export default function PipelineRunner({ onComplete }: Props) {
   const [statuses, setStatuses] = useState<StepStatus[]>(STEPS.map(() => 'idle'))
-  const [visibleLogs, setVisibleLogs] = useState<string[][]>(STEPS.map(() => []))
+  const [visibleLogs, setVisibleLogs] = useState<string[][]>(STEPS.map((): string[] => []))
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
   const logRefs = useRef<(HTMLDivElement | null)[]>([])

@@ -555,15 +555,15 @@ export function getProject(id: string): Project | undefined {
   return MOCK_PROJECTS.find((p) => p.id === id)
 }
 
-export function formatCurrency(value: number): string {
-  if (!Number.isFinite(value)) return '$0'
+export function formatCurrency(value: number | undefined | null): string {
+  if (value == null || !Number.isFinite(value)) return '$0'
   if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`
   if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`
   return `$${value.toFixed(0)}`
 }
 
-export function formatPercent(value: number): string {
-  if (!Number.isFinite(value)) return '0.0%'
+export function formatPercent(value: number | undefined | null): string {
+  if (value == null || !Number.isFinite(value)) return '0.0%'
   return `${(value * 100).toFixed(1)}%`
 }
 

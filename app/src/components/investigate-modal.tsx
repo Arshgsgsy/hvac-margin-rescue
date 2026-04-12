@@ -51,7 +51,7 @@ export function InvestigateModal({ project, onClose }: InvestigateModalProps) {
   }
 
   const config = severityConfig[project.severity] ?? severityConfig.watch
-  const totalOverrun = project.laborOverrun + project.materialOverrun
+  const totalOverrun = (project.laborOverrun ?? 0) + (project.materialOverrun ?? 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -156,7 +156,7 @@ export function InvestigateModal({ project, onClose }: InvestigateModalProps) {
 
 // Advanced Side Views
 function ExecutiveView({ project }: { project: Project }) {
-  const totalOverrun = project.laborOverrun + project.materialOverrun
+  const totalOverrun = (project.laborOverrun ?? 0) + (project.materialOverrun ?? 0)
   const recoveryActions = project.recoveryActions ?? []
   const recoveryPotential = recoveryActions.reduce((sum, a) => sum + a.amount, 0)
   const rootCause = project.rootCause ?? 'undetermined project factors'
@@ -192,7 +192,7 @@ function ExecutiveView({ project }: { project: Project }) {
       <div className="rounded-xl border border-border p-5">
         <h4 className="font-semibold text-foreground mb-3">Executive Summary</h4>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          {project.name} is currently experiencing a margin erosion of {formatPercent(Math.abs(project.marginDelta))} 
+          {project.name} is currently experiencing a margin erosion of {formatPercent(Math.abs(project.marginDelta ?? 0))}
           from the original bid margin of {formatPercent(project.bidMargin)}. The project has accumulated 
           {formatCurrency(totalOverrun)} in cost overruns primarily due to {rootCause.toLowerCase()}.
           Recovery potential is estimated at {formatCurrency(recoveryPotential)} through recommended actions.
@@ -554,12 +554,12 @@ function RecommendationTab({ project, config, totalOverrun }: TabProps) {
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-2 rounded-full ${
-                    action.priority === 'high' ? 'bg-red-500' :
-                    action.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
+                    (action.priority ?? 0) <= 1 ? 'bg-red-500' :
+                    (action.priority ?? 0) <= 3 ? 'bg-amber-500' : 'bg-blue-500'
                   }`} />
                   <div>
                     <p className="text-sm font-medium text-foreground">{action.description}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{action.priority} priority | {action.category.replace('_', ' ')}</p>
+                    <p className="text-xs text-muted-foreground capitalize">Priority {action.priority ?? 'N/A'} | {(action as any).category?.replace('_', ' ') ?? 'general'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

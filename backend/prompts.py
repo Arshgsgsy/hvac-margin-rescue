@@ -274,7 +274,9 @@ Do not answer like a dashboard. Answer like an operator advising a CFO."""
 def determine_stage(project: dict) -> str:
     """Determine project stage from billing percentage"""
     billing = project.get("billing_status", {})
-    pct = billing.get("percent_billed", 0) or 0
+    pct = billing.get("percent_billed")
+    if pct is None:
+        pct = billing.get("percent_complete", 0) or 0
     if pct < STAGE_ACTIVE_THRESHOLD:
         return "early"
     elif pct < STAGE_LATE_THRESHOLD:
@@ -292,7 +294,8 @@ def build_project_packet(project: dict) -> dict:
     material = project.get("material_cost", {})
     billing = project.get("billing_status", {})
     contract_value = project.get("contract_value", 0) or 0
-    pct_billed = billing.get("percent_billed", 0) or 0
+    billing_data_available = bool(project.get("billing_data_available", billing.get("percent_billed") is not None))
+    pct_billed = billing.get("percent_billed") if billing_data_available else None
     pct_complete = billing.get("percent_complete", 0) or 0
 
     # Calculate values
@@ -302,18 +305,18 @@ def build_project_packet(project: dict) -> dict:
     actual_material = material.get("actual", 0) or 0
     estimated_cost_total = est_labor + est_material
     actual_cost_total = actual_labor + actual_material
-    billing_gap_pct = pct_complete - pct_billed
-    billed_to_date = contract_value * pct_billed if contract_value else 0
-    retention_held = billed_to_date * RETENTION_RATE  # Standard retention
+    billing_gap_pct = pct_complete - pct_billed if pct_billed is not None else None
+    billed_to_date = contract_value * pct_billed if contract_value and pct_billed is not None else None
+    retention_held = billed_to_date * RETENTION_RATE if billed_to_date is not None else None
 
     # Calculate unbilled
-    unbilled = billing_gap_pct * contract_value if billing_gap_pct > 0 else 0
+    unbilled = billing_gap_pct * contract_value if billing_gap_pct is not None and billing_gap_pct > 0 else None
 
     return {
         "project": {
             "project_id": project.get("id"),
             "project_name": project.get("name"),
-            "project_stage": determine_stage(project),
+            "project_stage": project.get("project_stage") or determine_stage(project),
             "region": project.get("region"),
             "customer": project.get("gc_name"),
             "delivery_status": None
@@ -375,8 +378,8 @@ def build_project_packet(project: dict) -> dict:
             "largest_variance_dollars": max(actual_labor - est_labor, actual_material - est_material),
             "labor_overrun_multiple": actual_labor / est_labor if est_labor > 0 else None,
             "material_overrun_multiple": actual_material / est_material if est_material > 0 else None,
-            "is_billing_nearly_complete": pct_billed >= BILLING_NEARLY_COMPLETE_THRESHOLD,
-            "is_project_effectively_complete": pct_billed >= BILLING_COMPLETE_THRESHOLD,
+            "is_billing_nearly_complete": pct_billed is not None and pct_billed >= BILLING_NEARLY_COMPLETE_THRESHOLD,
+            "is_project_effectively_complete": pct_billed is not None and pct_billed >= BILLING_COMPLETE_THRESHOLD,
             "recovery_paths_available": _determine_recovery_paths(project, pct_billed, billing_gap_pct)
         },
         "source_trace": {
@@ -412,19 +415,19 @@ def _summarize_cos(cos: list) -> str | None:
     return ", ".join(parts) if parts else None
 
 
-def _determine_recovery_paths(project: dict, pct_billed: float, billing_gap: float) -> list[str]:
+def _determine_recovery_paths(project: dict, pct_billed: float | None, billing_gap: float | None) -> list[str]:
     """Determine which recovery paths are available"""
     paths = []
-    if billing_gap > BILLING_GAP_RECOVERY_THRESHOLD:
+    if billing_gap is not None and billing_gap > BILLING_GAP_RECOVERY_THRESHOLD:
         paths.append("billing_acceleration")
     cos = project.get("change_orders", [])
     if any(co.get("status", "").lower() == "pending" for co in cos):
         paths.append("pending_change_orders")
     if any(co.get("status", "").lower() == "rejected" for co in cos):
         paths.append("rejected_co_escalation")
-    if pct_billed < BILLING_COMPLETE_THRESHOLD:
+    if pct_billed is not None and pct_billed < BILLING_COMPLETE_THRESHOLD:
         paths.append("retention_release")
-    if pct_billed < STAGE_LATE_THRESHOLD:
+    if pct_billed is None or pct_billed < STAGE_LATE_THRESHOLD:
         paths.append("operational_efficiency")
     return paths
 
@@ -444,6 +447,21 @@ def build_project_context(project: dict) -> str:
     labor = project.get("labor_cost", {})
     material = project.get("material_cost", {})
     billing = project.get("billing_status", {})
+    billing_available = bool(project.get("billing_data_available", billing.get("percent_billed") is not None))
+    billing_gap = project.get("billing_gap")
+    billing_summary = (
+        f"""BILLING STATUS
+  % Complete: {pct(billing.get('percent_complete'))}
+  % Billed:   {pct(billing.get('percent_billed'))}
+  Billing Gap: {pct(billing_gap)} ({usd((project.get('contract_value', 0) or 0) * (billing_gap or 0))} unbilled)
+"""
+        if billing_available
+        else f"""BILLING STATUS
+  % Complete: {pct(billing.get('percent_complete'))}
+  % Billed:   N/A (billing history unavailable)
+  Billing Gap: N/A
+"""
+    )
 
     ctx = f"""PROJECT: {project.get('id', '')} -- {project.get('name', '')}
 SECTOR: {project.get('sector', '')}
@@ -459,11 +477,7 @@ COST BREAKDOWN
   Labor    -- Budget: {usd(labor.get('budget'))} | Actual: {usd(labor.get('actual'))} | Overrun: {usd(project.get('labor_overrun'))}
   Material -- Budget: {usd(material.get('budget'))} | Actual: {usd(material.get('actual'))} | Overrun: {usd(project.get('material_overrun'))}
 
-BILLING STATUS
-  % Complete: {pct(billing.get('percent_complete'))}
-  % Billed:   {pct(billing.get('percent_billed'))}
-  Billing Gap: {pct(project.get('billing_gap'))} ({usd((project.get('contract_value', 0) or 0) * (project.get('billing_gap', 0) or 0))} unbilled)
-
+{billing_summary}
 FIELD NOTES
 {project.get('field_note_summary') or 'None available.'}
 

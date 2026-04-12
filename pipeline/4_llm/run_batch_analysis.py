@@ -102,7 +102,8 @@ def build_project_packet(project: dict) -> dict:
     est_material = project.get("est_material", 0) or 0
     actual_material = project.get("actual_material_cost", 0) or 0
     contract_value = project.get("original_contract_value", 0) or 0
-    pct_billed = project.get("pct_billed", 0) or 0
+    billing_data_available = bool(project.get("billing_data_available", False))
+    pct_billed = project.get("pct_billed") if billing_data_available else None
     total_budget = project.get("total_budget", 0) or 0
     actual_tracked = project.get("actual_tracked_cost", 0) or 0
 
@@ -112,11 +113,11 @@ def build_project_packet(project: dict) -> dict:
     estimated_margin_pct = project.get("bid_margin", 0) or 0
     realized_margin_pct = project.get("realized_margin_pct", 0) or 0
     pct_complete = min(actual_tracked / total_budget, 1.0) if total_budget > 0 else 0
-    billing_gap_pct = pct_complete - pct_billed
+    billing_gap_pct = pct_complete - pct_billed if pct_billed is not None else None
 
     # Estimate retention (typically 10% of billed)
-    billed_to_date = contract_value * pct_billed if contract_value else 0
-    retention_held = billed_to_date * RETENTION_RATE  # Standard retention
+    billed_to_date = contract_value * pct_billed if contract_value and pct_billed is not None else None
+    retention_held = billed_to_date * RETENTION_RATE if billed_to_date is not None else None
 
     # Build packet conforming to project_packet.schema.json
     return {
@@ -149,7 +150,7 @@ def build_project_packet(project: dict) -> dict:
             "percent_complete": pct_complete,
             "billing_gap_pct": billing_gap_pct,
             "retention_held": retention_held,
-            "unbilled_approved_amount": billing_gap_pct * contract_value if billing_gap_pct > 0 else 0
+            "unbilled_approved_amount": billing_gap_pct * contract_value if billing_gap_pct is not None and billing_gap_pct > 0 else None
         },
         "change_orders": {
             "approved_count": project.get("co_approved_count", 0),
@@ -181,8 +182,8 @@ def build_project_packet(project: dict) -> dict:
             "largest_variance_dollars": project.get("largest_variance_dollars"),
             "labor_overrun_multiple": actual_labor / est_labor if est_labor > 0 else None,
             "material_overrun_multiple": actual_material / est_material if est_material > 0 else None,
-            "is_billing_nearly_complete": pct_billed >= BILLING_NEARLY_COMPLETE_THRESHOLD,
-            "is_project_effectively_complete": pct_billed >= BILLING_COMPLETE_THRESHOLD,
+            "is_billing_nearly_complete": pct_billed is not None and pct_billed >= BILLING_NEARLY_COMPLETE_THRESHOLD,
+            "is_project_effectively_complete": pct_billed is not None and pct_billed >= BILLING_COMPLETE_THRESHOLD,
             "recovery_paths_available": _determine_recovery_paths(project, pct_billed, billing_gap_pct)
         },
         "source_trace": {
@@ -193,18 +194,18 @@ def build_project_packet(project: dict) -> dict:
     }
 
 
-def _determine_recovery_paths(project: dict, pct_billed: float, billing_gap: float) -> list[str]:
+def _determine_recovery_paths(project: dict, pct_billed: float | None, billing_gap: float | None) -> list[str]:
     """Determine which recovery paths are available"""
     paths = []
-    if billing_gap > BILLING_GAP_RECOVERY_THRESHOLD:
+    if billing_gap is not None and billing_gap > BILLING_GAP_RECOVERY_THRESHOLD:
         paths.append("billing_acceleration")
     if project.get("co_pending_value", 0) > 0:
         paths.append("pending_change_orders")
     if project.get("co_rejected_value", 0) > 0:
         paths.append("rejected_co_escalation")
-    if pct_billed < BILLING_COMPLETE_THRESHOLD:
+    if pct_billed is not None and pct_billed < BILLING_COMPLETE_THRESHOLD:
         paths.append("retention_release")
-    if pct_billed < STAGE_LATE_THRESHOLD:
+    if pct_billed is None or pct_billed < STAGE_LATE_THRESHOLD:
         paths.append("operational_efficiency")
     return paths
 

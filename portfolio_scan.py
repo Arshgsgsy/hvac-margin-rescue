@@ -311,13 +311,14 @@ def main():
         note="[NOTE] Billing file not found, proceeding without billing data: {path}",
     )
     if billing.empty:
-        billing_proj = pd.DataFrame(columns=["project_id", "cumulative_billed"])
+        billing_proj = pd.DataFrame(columns=["project_id", "cumulative_billed", "billing_data_available"])
     else:
         billing = _coerce_numeric(billing, ["cumulative_billed"])
         billing_proj = (
             billing.groupby("project_id", as_index=False)
             .agg(cumulative_billed=("cumulative_billed", "max"))
         )
+        billing_proj["billing_data_available"] = True
 
     weekly_cost_features = _summarize_weekly_costs(
         _read_csv(
@@ -379,6 +380,10 @@ def main():
             project_health[column] = default
         project_health[column] = pd.to_numeric(project_health[column], errors="coerce").fillna(default)
 
+    if "billing_data_available" not in project_health.columns:
+        project_health["billing_data_available"] = False
+    project_health["billing_data_available"] = project_health["billing_data_available"].fillna(False).astype(bool)
+
     project_health["actual_tracked_cost"] = (
         project_health["actual_labor_cost"] + project_health["actual_material_cost"]
     )
@@ -413,9 +418,11 @@ def main():
         project_health["cumulative_billed"],
         project_health["adjusted_contract"],
     ).clip(lower=0, upper=1)
+    project_health.loc[~project_health["billing_data_available"], "pct_billed"] = np.nan
     project_health["billing_gap_pct"] = (
         project_health["pct_complete"] - project_health["pct_billed"]
-    ).fillna(0)
+    )
+    project_health.loc[~project_health["billing_data_available"], "billing_gap_pct"] = np.nan
     project_health["budget_coverage"] = _safe_divide(
         project_health["total_budget"],
         project_health["original_contract_value"],
