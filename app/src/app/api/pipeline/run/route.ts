@@ -1,31 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runPipeline } from '@/lib/pipeline/engine'
+
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}))
-    const csvFiles = body.csvFiles as Record<string, string> | undefined
-    
-    if (csvFiles && Object.keys(csvFiles).length > 0) {
-      // Run the actual pipeline with provided data
-      const csvMap = new Map(Object.entries(csvFiles))
-      const result = await runPipeline(csvMap)
-      
-      return NextResponse.json({
-        status: result.status,
-        mode: 'live',
-        summary: result.summary,
-        flagged_projects: result.flagged_projects,
-        steps: result.steps,
-      })
-    }
-    
-    // No data provided - return instruction to use simulation
-    return NextResponse.json({
-      status: 'ready',
-      mode: 'simulation',
-      message: 'No CSV data provided. Upload files first or run in simulation mode.',
+    // Forward the request to the Python backend
+    const response = await fetch(`${BACKEND_URL}/pipeline/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     })
+
+    if (!response.ok) {
+      const error = await response.text()
+      return NextResponse.json({ 
+        status: 'error',
+        error: `Backend pipeline failed: ${error}` 
+      }, { status: response.status })
+    }
+
+    const result = await response.json()
+    return NextResponse.json(result)
     
   } catch (error) {
     console.error('[v0] Pipeline error:', error)
@@ -36,11 +30,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Also support GET for status checks
 export async function GET() {
-  return NextResponse.json({
-    status: 'ready',
-    mode: 'standalone',
-    message: 'Pipeline engine ready. POST with csvFiles to run analysis.',
-  })
+  try {
+    const response = await fetch(`${BACKEND_URL}/pipeline/status`)
+    if (response.ok) {
+      return NextResponse.json(await response.json())
+    }
+    return NextResponse.json({ status: 'ready' })
+  } catch {
+    return NextResponse.json({ status: 'backend_offline' })
+  }
 }

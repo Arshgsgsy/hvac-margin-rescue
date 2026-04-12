@@ -1,12 +1,36 @@
 import { NextResponse } from 'next/server'
 
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
+
 export async function GET() {
-  // In v0 environment, we don't have a separate Python backend
-  // The pipeline runs directly in Next.js using the pre-generated data
-  return NextResponse.json({
-    status: 'ok',
-    backend: 'connected', // Always report connected - we use simulation/pre-generated data
-    mode: 'standalone',
-    message: 'Pipeline runs directly in the frontend using pre-processed data',
-  })
+  try {
+    // Check if Python backend is running
+    const response = await fetch(`${BACKEND_URL}/health`, {
+      signal: AbortSignal.timeout(5000),
+    })
+
+    if (response.ok) {
+      const backendHealth = await response.json()
+      return NextResponse.json({
+        status: 'ok',
+        backend: 'connected',
+        backendHealth,
+        backendUrl: BACKEND_URL,
+      })
+    }
+
+    return NextResponse.json({
+      status: 'degraded',
+      backend: 'error',
+      message: 'Backend returned non-OK status',
+    })
+
+  } catch (error) {
+    return NextResponse.json({
+      status: 'degraded',
+      backend: 'offline',
+      message: 'Python backend is not running',
+      backendUrl: BACKEND_URL,
+    })
+  }
 }

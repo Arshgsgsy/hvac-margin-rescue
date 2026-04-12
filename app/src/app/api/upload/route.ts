@@ -66,22 +66,42 @@ export async function POST(request: NextRequest) {
     const missingFiles = EXPECTED_CSV_FILES.filter(f => !extractedNames.includes(f))
     const foundFiles = EXPECTED_CSV_FILES.filter(f => extractedNames.includes(f))
     
-    // Build csvFiles map for pipeline
-    const csvFiles: Record<string, string> = {}
-    for (const file of extractedFiles) {
-      csvFiles[file.name] = file.content
+    // Forward files to Python backend
+    const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
+    let backendResult = null
+    let backendConnected = false
+
+    try {
+      const backendFormData = new FormData()
+      for (const { name, content } of extractedFiles) {
+        const blob = new Blob([content], { type: 'text/csv' })
+        backendFormData.append('files', blob, name)
+      }
+
+      const backendResponse = await fetch(`${BACKEND_URL}/upload`, {
+        method: 'POST',
+        body: backendFormData,
+      })
+
+      if (backendResponse.ok) {
+        backendResult = await backendResponse.json()
+        backendConnected = true
+      }
+    } catch (error) {
+      console.error('[v0] Backend upload error:', error)
     }
     
     return NextResponse.json({
       status: 'ok',
       files: extractedFiles.map(f => ({ name: f.name, size: f.size })),
-      csvFiles, // Include actual CSV content for pipeline
       expectedFiles: EXPECTED_CSV_FILES,
       foundFiles,
       missingFiles,
-      message: missingFiles.length === 0 
-        ? 'All expected files found! Ready to analyze.'
-        : `Found ${foundFiles.length}/${EXPECTED_CSV_FILES.length} expected files. Ready to analyze.`,
+      backendConnected,
+      backendResult,
+      message: backendConnected 
+        ? 'Files uploaded to backend successfully. Ready to analyze.'
+        : `Files extracted locally. Found ${foundFiles.length}/${EXPECTED_CSV_FILES.length} expected files.`,
     })
 
   } catch (error) {
