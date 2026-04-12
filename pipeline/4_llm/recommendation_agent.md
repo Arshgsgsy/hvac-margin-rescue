@@ -20,6 +20,8 @@ Extend the diagnosis with recovery actions. Return JSON:
   "project_name": "string",
   "severity": "from diagnosis",
   "headline": "from diagnosis",
+  "project_mode": "protect_margin | accelerate_cash | commercial_recovery | closeout_only",
+  "executive_brief": "2-3 sentence CFO-ready summary of what to do and why",
   "financial_snapshot": "from diagnosis",
   "root_causes": "from diagnosis",
   "recovery_actions": [
@@ -32,9 +34,24 @@ Extend the diagnosis with recovery actions. Return JSON:
       "urgency": "immediate | this_week | this_month | ongoing",
       "effort": "low | medium | high",
       "time_to_cash_days": number or null,
-      "linked_root_cause": "label from root_causes"
+      "linked_root_cause": "label from root_causes",
+      "probability_of_success": 0.0 to 1.0,
+      "blocking_items": ["string"] or [],
+      "evidence_refs": ["string"] or []
     }
   ],
+  "primary_action": {
+    "priority": 1,
+    "action": "The single most important move to make now",
+    "owner": "Project Manager | Finance | Operations | Executive",
+    "financial_logic": "Why this should be first",
+    "estimated_recovery_dollars": number or null,
+    "urgency": "immediate | this_week | this_month | ongoing"
+  },
+  "do_not_pursue": [
+    "Low-value or late-stage actions the team should skip"
+  ],
+  "blocking_items": ["Portfolio-level blockers to clear first"] or [],
   "forecast_if_no_action": "One sentence describing likely outcome",
   "forecast_with_action": "One sentence describing best-case outcome if actions taken",
   "total_recoverable_estimate": number,
@@ -115,6 +132,8 @@ Order by:
 2. Lowest effort / fastest to execute
 3. Most certain outcome
 
+Return only the strongest 3-5 actions. A shorter, sharper plan is better than a long list.
+
 ### Step 5: Calculate Totals and Profit Impact
 - Sum `estimated_recovery_dollars` across all actions → `total_recoverable_estimate`
 - Calculate `profit_impact`:
@@ -135,6 +154,17 @@ Always include the dollar improvement explicitly, e.g.:
 - "Without action, project closes at -$312K loss"
 - "With full execution, project recovers to +$47K profit (net improvement: $359K)"
 
+### Step 7: Force A Point Of View
+- Set `project_mode` to the dominant posture on this job:
+  - `protect_margin`: unfinished work still has operational upside
+  - `accelerate_cash`: main win is billing / retention timing
+  - `commercial_recovery`: CO / claim work is the real lever
+  - `closeout_only`: work is effectively done; only closeout dollars remain
+- Populate `primary_action` with the first thing the team should do Monday morning
+- Populate `executive_brief` with the shortest possible CFO memo
+- Populate `do_not_pursue` with 1-3 actions that sound plausible but are not worth time
+- Populate `blocking_items` with only the blockers that truly stand between the team and money
+
 ## Action Quality Rules
 
 1. **Specific**: Name the SOV line, the CO number, the dollar amount
@@ -147,6 +177,8 @@ Always include the dollar improvement explicitly, e.g.:
 8. **Effort-rated**: low (single email/call), medium (days of work), high (weeks of negotiation)
 9. **Time-to-cash**: Estimate days until the money is actually recovered
 10. **Cost-aware**: Estimate hours to execute (low=2h, medium=8h, high=24h)
+11. **Solution-first**: The output should read like an operator's plan, not an analyst's note dump
+12. **No dashboard language**: Do not say "monitor," "review dashboard," or "investigate further" unless it is truly the only defensible answer
 
 ## Fields for Portfolio Optimization
 
@@ -206,6 +238,19 @@ If you cannot estimate, use null and explain in `financial_logic`.
       "time_to_cash_days": 45,
       "linked_root_cause": "Change Order Recovery Failure"
     }
+  ],
+  "primary_action": {
+    "priority": 1,
+    "action": "Submit catch-up billing for unbilled approved work (SOV lines 3, 7, 12)",
+    "owner": "Project Manager",
+    "financial_logic": "Fastest collectible cash on the job.",
+    "estimated_recovery_dollars": 234000,
+    "urgency": "immediate"
+  },
+  "project_mode": "accelerate_cash",
+  "executive_brief": "This job still has recoverable money, but the first win is cash acceleration, not a broad operational reset. Push catch-up billing immediately, then escalate the rejected CO package with owner-directed work evidence.",
+  "do_not_pursue": [
+    "Do not spend field time on labor-efficiency initiatives if the project is already substantially complete."
   ],
   "forecast_if_no_action": "Project will close at -12% margin (calculated loss based on current data)",
   "forecast_with_action": "With full execution, project can recover to +3% margin",

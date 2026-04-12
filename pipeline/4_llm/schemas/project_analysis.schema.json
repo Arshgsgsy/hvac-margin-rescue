@@ -29,6 +29,14 @@
     "headline": {
       "type": "string"
     },
+    "project_mode": {
+      "type": "string",
+      "enum": ["protect_margin", "accelerate_cash", "commercial_recovery", "closeout_only"]
+    },
+    "executive_brief": {
+      "type": "string",
+      "description": "Short CFO-facing recovery memo"
+    },
     "financial_snapshot": {
       "type": "object",
       "additionalProperties": false,
@@ -185,6 +193,22 @@
             "type": ["number", "null"],
             "description": "Probability-weighted recovery: estimated_recovery × confidence"
           },
+          "probability_of_success": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Estimated probability that the action converts to money"
+          },
+          "blocking_items": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Only the concrete blockers preventing action execution"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Short evidence references backing the action"
+          },
           "recovery_type": {
             "type": ["string", "null"],
             "enum": ["billing", "change_order", "retention", "operational", "claim", null],
@@ -192,6 +216,31 @@
           }
         }
       }
+    },
+    "primary_action": {
+      "$ref": "#/properties/recovery_actions/items"
+    },
+    "do_not_pursue": {
+      "type": "array",
+      "description": "Actions that are not worth time on this project",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "reason": { "type": "string" },
+              "action": { "type": "string" }
+            }
+          }
+        ]
+      }
+    },
+    "blocking_items": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Cross-action blockers to clear before execution"
     },
     "forecast_if_no_action": {
       "type": "string"

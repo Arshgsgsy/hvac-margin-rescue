@@ -1,253 +1,507 @@
-import duckdb
 import sys
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from backend.config import DATA_DIR
 
+
 OUTPUT_DIR = Path("output_summaries")
 
-con = duckdb.connect()
 
-# ── Check required files ────────────────────────────────────────────────
-labor_summary_file = OUTPUT_DIR / "labor_project_summary.csv"
-contracts_file = DATA_DIR / "contracts_all.csv"
+def _read_csv(path: Path, *, required: bool = False, note: str | None = None) -> pd.DataFrame:
+    if path.exists():
+        return pd.read_csv(path, low_memory=False)
+    if required:
+        raise FileNotFoundError(f"Required input not found: {path}")
+    if note:
+        print(note.format(path=path))
+    return pd.DataFrame()
 
-if not labor_summary_file.exists():
-    print(f"[SKIP] Labor summary not found: {labor_summary_file}")
-    print("Portfolio scan skipped - no labor data available")
-    sys.exit(0)
 
-if not contracts_file.exists():
-    print(f"[SKIP] Contracts file not found: {contracts_file}")
-    print("Portfolio scan skipped - no contract data available")
-    sys.exit(0)
+def _safe_divide(numerator, denominator):
+    numerator = pd.to_numeric(numerator, errors="coerce")
+    denominator = pd.to_numeric(denominator, errors="coerce")
+    result = numerator / denominator.replace({0: np.nan})
+    return result.replace([np.inf, -np.inf], np.nan)
 
-# ── Load output summaries (already aggregated) ──────────────────────────
-con.execute("""
-CREATE TABLE labor_proj AS
-SELECT project_id, total_labor_cost AS actual_labor_cost, total_hours_st, total_hours_ot
-FROM read_csv_auto('output_summaries/labor_project_summary.csv', header=True)
-""")
 
-# Material is optional
-material_summary_file = OUTPUT_DIR / "material_project_summary.csv"
-if material_summary_file.exists():
-    con.execute("""
-    CREATE TABLE material_proj AS
-    SELECT project_id, total_material_cost AS actual_material_cost
-    FROM read_csv_auto('output_summaries/material_project_summary.csv', header=True)
-    """)
-else:
-    print("[NOTE] Material summary not found, proceeding without material data")
-    con.execute("""
-    CREATE TABLE material_proj AS
-    SELECT project_id, 0.0 AS actual_material_cost
-    FROM labor_proj
-    """)
+def _coerce_numeric(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    for column in columns:
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+    return df
 
-# ── Load raw tables needed for Step 2 ───────────────────────────────────
-con.execute(f"""
-CREATE TABLE contracts AS
-SELECT
-    project_id, project_name,
-    TRY_CAST(original_contract_value AS DOUBLE) AS original_contract_value,
-    gc_name
-FROM read_csv_auto('{contracts_file}', header=True)
-""")
 
-# Budget is optional
-budget_file = DATA_DIR / "sov_budget_all.csv"
-if budget_file.exists():
-    con.execute(f"""
-    CREATE TABLE budget_proj AS
-    SELECT
-        project_id,
-        SUM(TRY_CAST(estimated_labor_cost AS DOUBLE))     AS est_labor,
-        SUM(TRY_CAST(estimated_material_cost AS DOUBLE))   AS est_material,
-        SUM(TRY_CAST(estimated_equipment_cost AS DOUBLE))  AS est_equip,
-        SUM(TRY_CAST(estimated_sub_cost AS DOUBLE))        AS est_sub,
-        SUM(TRY_CAST(estimated_labor_cost AS DOUBLE))
-          + SUM(TRY_CAST(estimated_material_cost AS DOUBLE))
-          + SUM(TRY_CAST(estimated_equipment_cost AS DOUBLE))
-          + SUM(TRY_CAST(estimated_sub_cost AS DOUBLE))    AS total_budget
-    FROM read_csv_auto('{budget_file}', header=True)
-    GROUP BY project_id
-    """)
-else:
-    print("[NOTE] Budget file not found, using labor actuals as budget proxy")
-    con.execute("""
-    CREATE TABLE budget_proj AS
-    SELECT
-        project_id,
-        actual_labor_cost AS est_labor,
-        0.0 AS est_material,
-        0.0 AS est_equip,
-        0.0 AS est_sub,
-        actual_labor_cost AS total_budget
-    FROM labor_proj
-    """)
+def _latest_week_window(group: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    ordered = group.sort_values("week_start")
+    recent = ordered.tail(min(4, len(ordered)))
+    prior = ordered.iloc[max(0, len(ordered) - 8):max(0, len(ordered) - 4)]
+    if prior.empty and len(ordered) > len(recent):
+        prior = ordered.iloc[: max(0, len(ordered) - len(recent))]
+    return recent, prior
 
-# ── Change orders: split approved vs rejected (optional) ────────────────
-change_orders_file = DATA_DIR / "change_orders_all.csv"
-if change_orders_file.exists():
-    con.execute(f"""
-    CREATE TABLE co_approved AS
-    SELECT project_id, SUM(TRY_CAST(amount AS DOUBLE)) AS co_approved_value
-    FROM read_csv_auto('{change_orders_file}', header=True)
-    WHERE LOWER(TRIM(CAST(status AS VARCHAR))) = 'approved'
-    GROUP BY project_id
-    """)
 
-    con.execute(f"""
-    CREATE TABLE co_rejected AS
-    SELECT project_id, SUM(TRY_CAST(amount AS DOUBLE)) AS co_rejected_value
-    FROM read_csv_auto('{change_orders_file}', header=True)
-    WHERE LOWER(TRIM(CAST(status AS VARCHAR))) = 'rejected'
-    GROUP BY project_id
-    """)
-else:
-    print("[NOTE] Change orders file not found, proceeding without CO data")
-    con.execute("CREATE TABLE co_approved (project_id VARCHAR, co_approved_value DOUBLE)")
-    con.execute("CREATE TABLE co_rejected (project_id VARCHAR, co_rejected_value DOUBLE)")
+def _summarize_weekly_costs(project_weekly: pd.DataFrame) -> pd.DataFrame:
+    if project_weekly.empty:
+        return pd.DataFrame(
+            columns=[
+                "project_id",
+                "active_weeks",
+                "recent_weekly_cost_avg",
+                "prior_weekly_cost_avg",
+                "burn_rate_acceleration",
+            ]
+        )
 
-# ── RFIs: count + cost-impact count per project (optional) ──────────────
-rfis_file = DATA_DIR / "rfis_all.csv"
-if rfis_file.exists():
-    con.execute(f"""
-    CREATE TABLE rfi_proj AS
-    SELECT
-        project_id,
-        COUNT(*) AS rfi_count,
-        SUM(CASE WHEN LOWER(TRIM(CAST(cost_impact AS VARCHAR))) IN ('true', 'yes', '1', 'y') THEN 1 ELSE 0 END) AS rfi_cost_impact_count,
-        SUM(CASE WHEN LOWER(TRIM(CAST(priority AS VARCHAR))) IN ('high', 'critical') THEN 1 ELSE 0 END) AS rfi_high_critical,
-        SUM(CASE WHEN LOWER(TRIM(CAST(status AS VARCHAR))) IN ('pending response', 'open') THEN 1 ELSE 0 END) AS rfi_open
-    FROM read_csv_auto('{rfis_file}', header=True)
-    GROUP BY project_id
-    """)
-else:
-    print("[NOTE] RFIs file not found, proceeding without RFI data")
-    con.execute("""
-    CREATE TABLE rfi_proj (
-        project_id VARCHAR,
-        rfi_count INT,
-        rfi_cost_impact_count INT,
-        rfi_high_critical INT,
-        rfi_open INT
+    project_weekly = project_weekly.copy()
+    project_weekly["week_start"] = pd.to_datetime(project_weekly["week_start"], errors="coerce")
+    project_weekly = _coerce_numeric(project_weekly, ["total_cost"])
+
+    summaries: list[dict] = []
+    for project_id, group in project_weekly.groupby("project_id"):
+        recent, prior = _latest_week_window(group.dropna(subset=["week_start"]))
+        recent_avg = float(recent["total_cost"].mean()) if not recent.empty else 0.0
+        prior_avg = float(prior["total_cost"].mean()) if not prior.empty else recent_avg
+        acceleration = 0.0
+        if prior_avg:
+            acceleration = (recent_avg - prior_avg) / prior_avg
+
+        summaries.append(
+            {
+                "project_id": project_id,
+                "active_weeks": int(group["week_start"].nunique()),
+                "recent_weekly_cost_avg": recent_avg,
+                "prior_weekly_cost_avg": prior_avg,
+                "burn_rate_acceleration": acceleration,
+            }
+        )
+
+    return pd.DataFrame(summaries)
+
+
+def _summarize_labor_weekly(labor_weekly: pd.DataFrame) -> pd.DataFrame:
+    if labor_weekly.empty:
+        return pd.DataFrame(
+            columns=[
+                "project_id",
+                "recent_ot_share",
+                "prior_ot_share",
+                "overtime_spike",
+                "recent_crew_size",
+                "prior_crew_size",
+                "crew_size_spike",
+            ]
+        )
+
+    labor_weekly = labor_weekly.copy()
+    labor_weekly["week_start"] = pd.to_datetime(labor_weekly["week_start"], errors="coerce")
+    labor_weekly = _coerce_numeric(
+        labor_weekly,
+        ["num_employees", "total_hours_st", "total_hours_ot"],
     )
-    """)
 
-# ── Billing: latest application per project (optional) ──────────────────
-billing_file = DATA_DIR / "billing_history_all.csv"
-if billing_file.exists():
-    con.execute(f"""
-    CREATE TABLE billing_proj AS
-    SELECT
-        project_id,
-        MAX(application_number) AS latest_app,
-        MAX(TRY_CAST(cumulative_billed AS DOUBLE)) AS cumulative_billed,
-        MAX(TRY_CAST(retention_held AS DOUBLE)) AS retention_held
-    FROM read_csv_auto('{billing_file}', header=True)
-    GROUP BY project_id
-    """)
-else:
-    print("[NOTE] Billing file not found, proceeding without billing data")
-    con.execute("""
-    CREATE TABLE billing_proj (
-        project_id VARCHAR,
-        latest_app INT,
-        cumulative_billed DOUBLE,
-        retention_held DOUBLE
+    summaries: list[dict] = []
+    for project_id, group in labor_weekly.groupby("project_id"):
+        group = group.dropna(subset=["week_start"])
+        recent, prior = _latest_week_window(group)
+
+        def _ot_share(frame: pd.DataFrame) -> float:
+            total_hours = frame["total_hours_st"].fillna(0).sum() + frame["total_hours_ot"].fillna(0).sum()
+            if total_hours <= 0:
+                return 0.0
+            return float(frame["total_hours_ot"].fillna(0).sum() / total_hours)
+
+        recent_ot_share = _ot_share(recent)
+        prior_ot_share = _ot_share(prior) if not prior.empty else recent_ot_share
+        recent_crew = float(recent["num_employees"].fillna(0).mean()) if not recent.empty else 0.0
+        prior_crew = float(prior["num_employees"].fillna(0).mean()) if not prior.empty else recent_crew
+        crew_spike = 0.0
+        if prior_crew:
+            crew_spike = (recent_crew - prior_crew) / prior_crew
+
+        summaries.append(
+            {
+                "project_id": project_id,
+                "recent_ot_share": recent_ot_share,
+                "prior_ot_share": prior_ot_share,
+                "overtime_spike": recent_ot_share - prior_ot_share,
+                "recent_crew_size": recent_crew,
+                "prior_crew_size": prior_crew,
+                "crew_size_spike": crew_spike,
+            }
+        )
+
+    return pd.DataFrame(summaries)
+
+
+def _summarize_change_orders(change_orders: pd.DataFrame) -> pd.DataFrame:
+    if change_orders.empty:
+        return pd.DataFrame(
+            columns=[
+                "project_id",
+                "co_approved_count",
+                "co_pending_count",
+                "co_rejected_count",
+                "co_approved_value",
+                "pending_co_value",
+                "co_rejected_value",
+            ]
+        )
+
+    change_orders = change_orders.copy()
+    change_orders["status_normalized"] = (
+        change_orders.get("status", pd.Series(dtype=str))
+        .astype(str)
+        .str.strip()
+        .str.lower()
     )
-    """)
+    change_orders["amount"] = pd.to_numeric(change_orders.get("amount"), errors="coerce").fillna(0.0)
+    change_orders["is_approved"] = change_orders["status_normalized"].eq("approved")
+    change_orders["is_rejected"] = change_orders["status_normalized"].isin({"rejected", "denied"})
+    change_orders["is_pending"] = ~(change_orders["is_approved"] | change_orders["is_rejected"])
 
-# ══════════════════════════════════════════════════════════════════════════
-# MASTER PROJECT HEALTH VIEW
-# ══════════════════════════════════════════════════════════════════════════
-con.execute("""
-CREATE TABLE project_health AS
-SELECT
-    c.project_id,
-    c.project_name,
-    c.original_contract_value,
-    c.gc_name,
+    grouped = (
+        change_orders.groupby("project_id", as_index=False)
+        .agg(
+            co_approved_count=("is_approved", "sum"),
+            co_pending_count=("is_pending", "sum"),
+            co_rejected_count=("is_rejected", "sum"),
+            co_approved_value=("amount", lambda series: series[change_orders.loc[series.index, "is_approved"]].sum()),
+            pending_co_value=("amount", lambda series: series[change_orders.loc[series.index, "is_pending"]].sum()),
+            co_rejected_value=("amount", lambda series: series[change_orders.loc[series.index, "is_rejected"]].sum()),
+        )
+    )
+    return grouped
 
-    -- Budget
-    b.est_labor,
-    b.est_material,
-    COALESCE(b.est_equip, 0) AS est_equip,
-    COALESCE(b.est_sub, 0) AS est_sub,
-    b.total_budget,
 
-    -- Actuals
-    COALESCE(l.actual_labor_cost, 0) AS actual_labor_cost,
-    COALESCE(m.actual_material_cost, 0) AS actual_material_cost,
-    COALESCE(l.actual_labor_cost, 0) + COALESCE(m.actual_material_cost, 0) AS actual_tracked_cost,
+def _summarize_rfis(rfis: pd.DataFrame) -> pd.DataFrame:
+    if rfis.empty:
+        return pd.DataFrame(
+            columns=[
+                "project_id",
+                "rfi_count",
+                "rfi_cost_impact_count",
+                "rfi_high_critical",
+                "rfi_open",
+                "max_open_rfi_age",
+            ]
+        )
 
-    -- Change orders
-    COALESCE(co_a.co_approved_value, 0) AS co_approved_value,
-    COALESCE(co_r.co_rejected_value, 0) AS co_rejected_value,
+    rfis = rfis.copy()
+    rfis["status_normalized"] = rfis.get("status", pd.Series(dtype=str)).astype(str).str.strip().str.lower()
+    rfis["priority_normalized"] = rfis.get("priority", pd.Series(dtype=str)).astype(str).str.strip().str.lower()
+    rfis["cost_impact_normalized"] = rfis.get("cost_impact", pd.Series(dtype=str)).astype(str).str.strip().str.lower()
+    rfis["date_submitted"] = pd.to_datetime(rfis.get("date_submitted"), errors="coerce")
+    rfis["date_responded"] = pd.to_datetime(rfis.get("date_responded"), errors="coerce")
 
-    -- Derived: adjusted contract & margins
-    c.original_contract_value + COALESCE(co_a.co_approved_value, 0) AS adjusted_contract,
+    closed_statuses = {"closed", "resolved", "answered", "complete"}
+    open_mask = ~rfis["status_normalized"].isin(closed_statuses)
+    as_of_date = pd.Timestamp.now().normalize()
+    open_age = (as_of_date - rfis["date_submitted"]).dt.days.clip(lower=0)
+    rfis["open_rfi_age_days"] = np.where(open_mask, open_age, np.nan)
+    rfis["is_open"] = open_mask
+    rfis["is_cost_impact"] = rfis["cost_impact_normalized"].isin({"true", "yes", "1", "y"})
+    rfis["is_high_priority"] = rfis["priority_normalized"].isin({"high", "critical"})
 
-    CASE
-        WHEN b.total_budget IS NULL THEN NULL
-        ELSE 1 - (b.total_budget / NULLIF(c.original_contract_value, 0))
-    END AS bid_margin,
+    grouped = (
+        rfis.groupby("project_id", as_index=False)
+        .agg(
+            rfi_count=("project_id", "size"),
+            rfi_cost_impact_count=("is_cost_impact", "sum"),
+            rfi_high_critical=("is_high_priority", "sum"),
+            rfi_open=("is_open", "sum"),
+            max_open_rfi_age=("open_rfi_age_days", "max"),
+        )
+    )
+    return grouped
 
-    (c.original_contract_value + COALESCE(co_a.co_approved_value, 0))
-      - (COALESCE(l.actual_labor_cost, 0) + COALESCE(m.actual_material_cost, 0) + COALESCE(b.est_equip, 0) + COALESCE(b.est_sub, 0))
-      AS realized_margin_dollars,
 
-    ((c.original_contract_value + COALESCE(co_a.co_approved_value, 0))
-      - (COALESCE(l.actual_labor_cost, 0) + COALESCE(m.actual_material_cost, 0) + COALESCE(b.est_equip, 0) + COALESCE(b.est_sub, 0)))
-      / NULLIF(c.original_contract_value + COALESCE(co_a.co_approved_value, 0), 0)
-      AS realized_margin_pct,
+def main():
+    labor_summary_file = OUTPUT_DIR / "labor_project_summary.csv"
+    contracts_file = DATA_DIR / "contracts_all.csv"
 
-    -- Overrun %
-    (COALESCE(l.actual_labor_cost, 0) / NULLIF(b.est_labor, 0) - 1) * 100 AS labor_overrun_pct,
-    (COALESCE(m.actual_material_cost, 0) / NULLIF(b.est_material, 0) - 1) * 100 AS material_overrun_pct,
+    if not labor_summary_file.exists():
+        print(f"[SKIP] Labor summary not found: {labor_summary_file}")
+        print("Portfolio scan skipped - no labor data available")
+        sys.exit(0)
 
-    -- RFIs
-    COALESCE(r.rfi_count, 0) AS rfi_count,
-    COALESCE(r.rfi_cost_impact_count, 0) AS rfi_cost_impact_count,
-    COALESCE(r.rfi_high_critical, 0) AS rfi_high_critical,
-    COALESCE(r.rfi_open, 0) AS rfi_open,
+    if not contracts_file.exists():
+        print(f"[SKIP] Contracts file not found: {contracts_file}")
+        print("Portfolio scan skipped - no contract data available")
+        sys.exit(0)
 
-    -- Billing
-    COALESCE(bl.cumulative_billed, 0) AS cumulative_billed,
-    COALESCE(bl.cumulative_billed, 0)
-      / NULLIF(c.original_contract_value + COALESCE(co_a.co_approved_value, 0), 0)
-      AS pct_billed,
+    labor_proj = _read_csv(labor_summary_file, required=True)
+    labor_proj = labor_proj.rename(columns={"total_labor_cost": "actual_labor_cost"})
+    labor_proj = _coerce_numeric(labor_proj, ["actual_labor_cost", "total_hours_st", "total_hours_ot"])
 
-    -- Budget coverage (README: healthy = 88-110%)
-    b.total_budget / NULLIF(c.original_contract_value, 0) AS budget_coverage,
+    material_proj = _read_csv(
+        OUTPUT_DIR / "material_project_summary.csv",
+        note="[NOTE] Material summary not found, proceeding without material data: {path}",
+    )
+    if material_proj.empty:
+        material_proj = pd.DataFrame({"project_id": labor_proj["project_id"].unique(), "actual_material_cost": 0.0})
+    else:
+        material_proj = material_proj.rename(columns={"total_material_cost": "actual_material_cost"})
+        material_proj = _coerce_numeric(material_proj, ["actual_material_cost"])
 
-    -- OT share
-    COALESCE(l.total_hours_ot, 0) / NULLIF(COALESCE(l.total_hours_st, 0) + COALESCE(l.total_hours_ot, 0), 0) AS ot_share
+    contracts = _read_csv(contracts_file, required=True)
+    contracts = contracts[["project_id", "project_name", "original_contract_value", "gc_name"]].copy()
+    contracts = _coerce_numeric(contracts, ["original_contract_value"])
 
-FROM contracts c
-LEFT JOIN budget_proj b USING (project_id)
-LEFT JOIN labor_proj l USING (project_id)
-LEFT JOIN material_proj m USING (project_id)
-LEFT JOIN co_approved co_a USING (project_id)
-LEFT JOIN co_rejected co_r USING (project_id)
-LEFT JOIN rfi_proj r USING (project_id)
-LEFT JOIN billing_proj bl USING (project_id)
-""")
+    budget = _read_csv(
+        DATA_DIR / "sov_budget_all.csv",
+        note="[NOTE] Budget file not found, using labor actuals as a budget proxy: {path}",
+    )
+    if budget.empty:
+        budget_proj = labor_proj[["project_id", "actual_labor_cost"]].copy()
+        budget_proj["est_labor"] = budget_proj["actual_labor_cost"]
+        budget_proj["est_material"] = 0.0
+        budget_proj["est_equip"] = 0.0
+        budget_proj["est_sub"] = 0.0
+        budget_proj["total_budget"] = budget_proj["actual_labor_cost"]
+        budget_proj = budget_proj.drop(columns=["actual_labor_cost"])
+    else:
+        budget = _coerce_numeric(
+            budget,
+            [
+                "estimated_labor_cost",
+                "estimated_material_cost",
+                "estimated_equipment_cost",
+                "estimated_sub_cost",
+            ],
+        )
+        budget_proj = (
+            budget.groupby("project_id", as_index=False)
+            .agg(
+                est_labor=("estimated_labor_cost", "sum"),
+                est_material=("estimated_material_cost", "sum"),
+                est_equip=("estimated_equipment_cost", "sum"),
+                est_sub=("estimated_sub_cost", "sum"),
+            )
+        )
+        budget_proj["total_budget"] = (
+            budget_proj["est_labor"].fillna(0)
+            + budget_proj["est_material"].fillna(0)
+            + budget_proj["est_equip"].fillna(0)
+            + budget_proj["est_sub"].fillna(0)
+        )
 
-# ══════════════════════════════════════════════════════════════════════════
-# EXPORT project_health.csv
-# ══════════════════════════════════════════════════════════════════════════
-con.execute(f"""
-COPY (SELECT * FROM project_health ORDER BY realized_margin_dollars ASC)
-TO '{OUTPUT_DIR / "project_health.csv"}' (HEADER, DELIMITER ',')
-""")
+    co_summary = _summarize_change_orders(
+        _read_csv(
+            DATA_DIR / "change_orders_all.csv",
+            note="[NOTE] Change orders file not found, proceeding without CO data: {path}",
+        )
+    )
 
-count = con.execute("SELECT COUNT(*) FROM project_health").fetchone()[0]
-print(f"Exported: {OUTPUT_DIR / 'project_health.csv'} ({count} projects)")
+    rfi_summary = _summarize_rfis(
+        _read_csv(
+            DATA_DIR / "rfis_all.csv",
+            note="[NOTE] RFIs file not found, proceeding without RFI data: {path}",
+        )
+    )
 
-con.close()
+    billing = _read_csv(
+        DATA_DIR / "billing_history_all.csv",
+        note="[NOTE] Billing file not found, proceeding without billing data: {path}",
+    )
+    if billing.empty:
+        billing_proj = pd.DataFrame(columns=["project_id", "cumulative_billed"])
+    else:
+        billing = _coerce_numeric(billing, ["cumulative_billed"])
+        billing_proj = (
+            billing.groupby("project_id", as_index=False)
+            .agg(cumulative_billed=("cumulative_billed", "max"))
+        )
+
+    weekly_cost_features = _summarize_weekly_costs(
+        _read_csv(
+            OUTPUT_DIR / "project_weekly_summary.csv",
+            note="[NOTE] Project weekly summary not found, burn trend signals will be muted: {path}",
+        )
+    )
+    labor_weekly_features = _summarize_labor_weekly(
+        _read_csv(
+            OUTPUT_DIR / "labor_project_week_summary.csv",
+            note="[NOTE] Labor weekly summary not found, overtime/crew signals will be muted: {path}",
+        )
+    )
+
+    project_health = contracts.merge(budget_proj, on="project_id", how="left")
+    project_health = project_health.merge(labor_proj[["project_id", "actual_labor_cost", "total_hours_st", "total_hours_ot"]], on="project_id", how="left")
+    project_health = project_health.merge(material_proj[["project_id", "actual_material_cost"]], on="project_id", how="left")
+    project_health = project_health.merge(co_summary, on="project_id", how="left")
+    project_health = project_health.merge(rfi_summary, on="project_id", how="left")
+    project_health = project_health.merge(billing_proj, on="project_id", how="left")
+    project_health = project_health.merge(weekly_cost_features, on="project_id", how="left")
+    project_health = project_health.merge(labor_weekly_features, on="project_id", how="left")
+
+    numeric_defaults = {
+        "est_labor": 0.0,
+        "est_material": 0.0,
+        "est_equip": 0.0,
+        "est_sub": 0.0,
+        "total_budget": 0.0,
+        "actual_labor_cost": 0.0,
+        "actual_material_cost": 0.0,
+        "co_approved_count": 0,
+        "co_pending_count": 0,
+        "co_rejected_count": 0,
+        "co_approved_value": 0.0,
+        "pending_co_value": 0.0,
+        "co_rejected_value": 0.0,
+        "rfi_count": 0,
+        "rfi_cost_impact_count": 0,
+        "rfi_high_critical": 0,
+        "rfi_open": 0,
+        "max_open_rfi_age": 0.0,
+        "cumulative_billed": 0.0,
+        "recent_weekly_cost_avg": 0.0,
+        "prior_weekly_cost_avg": 0.0,
+        "burn_rate_acceleration": 0.0,
+        "recent_ot_share": 0.0,
+        "prior_ot_share": 0.0,
+        "overtime_spike": 0.0,
+        "recent_crew_size": 0.0,
+        "prior_crew_size": 0.0,
+        "crew_size_spike": 0.0,
+        "active_weeks": 0,
+        "total_hours_st": 0.0,
+        "total_hours_ot": 0.0,
+    }
+    for column, default in numeric_defaults.items():
+        if column not in project_health.columns:
+            project_health[column] = default
+        project_health[column] = pd.to_numeric(project_health[column], errors="coerce").fillna(default)
+
+    project_health["actual_tracked_cost"] = (
+        project_health["actual_labor_cost"] + project_health["actual_material_cost"]
+    )
+    project_health["adjusted_contract"] = (
+        project_health["original_contract_value"].fillna(0)
+        + project_health["co_approved_value"].fillna(0)
+    )
+    project_health["bid_margin"] = 1 - _safe_divide(project_health["total_budget"], project_health["original_contract_value"])
+    project_health["realized_margin_dollars"] = (
+        project_health["adjusted_contract"]
+        - (
+            project_health["actual_tracked_cost"]
+            + project_health["est_equip"]
+            + project_health["est_sub"]
+        )
+    )
+    project_health["realized_margin_pct"] = _safe_divide(
+        project_health["realized_margin_dollars"],
+        project_health["adjusted_contract"],
+    )
+    project_health["labor_overrun_pct"] = (
+        _safe_divide(project_health["actual_labor_cost"], project_health["est_labor"]) - 1
+    ) * 100
+    project_health["material_overrun_pct"] = (
+        _safe_divide(project_health["actual_material_cost"], project_health["est_material"]) - 1
+    ) * 100
+    project_health["pct_complete"] = _safe_divide(
+        project_health["actual_tracked_cost"],
+        project_health["total_budget"],
+    ).clip(lower=0, upper=1)
+    project_health["pct_billed"] = _safe_divide(
+        project_health["cumulative_billed"],
+        project_health["adjusted_contract"],
+    ).clip(lower=0, upper=1)
+    project_health["billing_gap_pct"] = (
+        project_health["pct_complete"] - project_health["pct_billed"]
+    ).fillna(0)
+    project_health["budget_coverage"] = _safe_divide(
+        project_health["total_budget"],
+        project_health["original_contract_value"],
+    )
+    project_health["ot_share"] = _safe_divide(
+        project_health["total_hours_ot"],
+        project_health["total_hours_st"] + project_health["total_hours_ot"],
+    )
+    project_health["labor_burn_ratio"] = _safe_divide(
+        project_health["actual_labor_cost"],
+        project_health["est_labor"],
+    )
+    project_health["material_burn_ratio"] = _safe_divide(
+        project_health["actual_material_cost"],
+        project_health["est_material"],
+    )
+    project_health["approved_co_pct"] = _safe_divide(
+        project_health["co_approved_value"],
+        project_health["original_contract_value"],
+    )
+    project_health["rejected_co_pct"] = _safe_divide(
+        project_health["co_rejected_value"],
+        project_health["original_contract_value"],
+    )
+    project_health["pending_co_pct"] = _safe_divide(
+        project_health["pending_co_value"],
+        project_health["original_contract_value"],
+    )
+    project_health["rfi_cost_impact_rate"] = _safe_divide(
+        project_health["rfi_cost_impact_count"],
+        project_health["rfi_count"],
+    )
+    project_health["rfi_per_million_contract"] = _safe_divide(
+        project_health["rfi_count"],
+        (project_health["original_contract_value"] / 1_000_000).replace({0: np.nan}),
+    )
+
+    remaining_weeks = np.ceil(
+        np.maximum(0, 1 - project_health["pct_complete"].fillna(0))
+        * project_health["active_weeks"].fillna(0)
+    )
+    project_health["forecast_cost_at_completion"] = (
+        project_health["actual_tracked_cost"]
+        + project_health["recent_weekly_cost_avg"].fillna(0) * remaining_weeks
+    )
+    project_health["prior_forecast_cost_at_completion"] = (
+        project_health["actual_tracked_cost"]
+        + project_health["prior_weekly_cost_avg"].fillna(0) * remaining_weeks
+    )
+    project_health["forecast_to_complete"] = (
+        project_health["forecast_cost_at_completion"] - project_health["total_budget"]
+    )
+    project_health["forecast_to_complete_trend"] = _safe_divide(
+        project_health["forecast_cost_at_completion"] - project_health["prior_forecast_cost_at_completion"],
+        project_health["total_budget"],
+    ).fillna(0)
+
+    fill_zero_columns = [
+        "bid_margin",
+        "realized_margin_pct",
+        "labor_overrun_pct",
+        "material_overrun_pct",
+        "budget_coverage",
+        "ot_share",
+        "labor_burn_ratio",
+        "material_burn_ratio",
+        "approved_co_pct",
+        "rejected_co_pct",
+        "pending_co_pct",
+        "rfi_cost_impact_rate",
+        "rfi_per_million_contract",
+        "forecast_to_complete_trend",
+    ]
+    for column in fill_zero_columns:
+        project_health[column] = pd.to_numeric(project_health[column], errors="coerce").fillna(0.0)
+
+    project_health = project_health.sort_values(
+        ["realized_margin_dollars", "project_id"],
+        ascending=[True, True],
+    )
+
+    output_file = OUTPUT_DIR / "project_health.csv"
+    project_health.to_csv(output_file, index=False)
+
+    print(f"Exported: {output_file} ({len(project_health)} projects)")
+
+
+if __name__ == "__main__":
+    main()

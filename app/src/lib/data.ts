@@ -574,10 +574,15 @@ export function getPriorityScore(p: Project): number {
   const laborOverrun = project.labor_overrun ?? project.laborOverrun ?? 0
   const materialOverrun = project.material_overrun ?? project.materialOverrun ?? 0
   const contractValue = project.contract_value ?? project.contractValue ?? 0
+  const primaryAction = p.primary_action ?? p.recovery_actions?.[0]
+  const actionValue = primaryAction?.expected_value ?? primaryAction?.estimated_recovery_dollars ?? primaryAction?.amount ?? 0
+  const timeToCash = primaryAction?.time_to_cash_days ?? 45
   const erosion = marginDelta * 100
   const billing = billingGap * 100 * 0.6
   const overrun = contractValue > 0 ? ((laborOverrun + materialOverrun) / contractValue) * 100 * 0.4 : 0
-  return erosion + billing + overrun
+  const actionScore = contractValue > 0 ? (actionValue / contractValue) * 100 * 1.1 : 0
+  const cashSpeed = actionValue > 0 ? Math.max(0, 20 - Math.min(timeToCash, 20)) : 0
+  return erosion + billing + overrun + actionScore + cashSpeed
 }
 
 export function getSortedByPriority<T extends Project>(projects: T[]) {

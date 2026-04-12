@@ -53,29 +53,39 @@ async def analyze_single_project(project_id: str, use_hybrid: bool = True):
             - Full CO/RFI details
     """
     if use_hybrid:
-        # Check if project exists in management summary
         summary = get_management_summary(project_id)
-        if not summary:
-            raise HTTPException(404, f"Project {project_id} not found in management summary")
+        if summary:
+            try:
+                analysis = await analyze_project_hybrid(project_id)
+                if analysis is None:
+                    raise HTTPException(500, "Failed to build hybrid packet")
+                return analysis
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(500, f"Hybrid analysis failed: {str(e)}")
 
-        try:
-            analysis = await analyze_project_hybrid(project_id)
-            if analysis is None:
-                raise HTTPException(500, "Failed to build hybrid packet")
-            return analysis
-        except Exception as e:
-            raise HTTPException(500, f"Hybrid analysis failed: {str(e)}")
-    else:
-        # Legacy approach
         project = load_single_project(project_id)
         if not project:
             raise HTTPException(404, f"Project {project_id} not found")
 
         try:
             analysis = await analyze_project(project)
+            analysis["analysis_mode"] = "legacy_fallback"
+            analysis["fallback_reason"] = "management_project_summary_missing"
             return analysis
         except Exception as e:
-            raise HTTPException(500, f"Analysis failed: {str(e)}")
+            raise HTTPException(500, f"Fallback analysis failed: {str(e)}")
+
+    project = load_single_project(project_id)
+    if not project:
+        raise HTTPException(404, f"Project {project_id} not found")
+
+    try:
+        analysis = await analyze_project(project)
+        return analysis
+    except Exception as e:
+        raise HTTPException(500, f"Analysis failed: {str(e)}")
 
 
 @router.get("/analyze/{project_id}/packet")
@@ -89,15 +99,22 @@ def get_project_packet(project_id: str, use_hybrid: bool = True):
     """
     if use_hybrid:
         packet = build_hybrid_project_packet(project_id)
-        if not packet:
-            raise HTTPException(404, f"Project {project_id} not found in management summary")
-        return packet
-    else:
-        # Legacy approach
+        if packet:
+            return packet
+
         project = load_single_project(project_id)
         if not project:
             raise HTTPException(404, f"Project {project_id} not found")
-        return build_project_packet(project)
+
+        fallback_packet = build_project_packet(project)
+        fallback_packet["analysis_mode"] = "legacy_fallback"
+        fallback_packet["fallback_reason"] = "management_project_summary_missing"
+        return fallback_packet
+
+    project = load_single_project(project_id)
+    if not project:
+        raise HTTPException(404, f"Project {project_id} not found")
+    return build_project_packet(project)
 
 
 def _run_batch_analysis_task():
@@ -141,8 +158,9 @@ def _run_batch_analysis_internal(projects: list[dict], use_hybrid: bool = True):
                 # Hybrid approach: uses CSV metrics + ALL field notes
                 analysis = analyze_project_hybrid_sync(project_id)
                 if analysis is None:
-                    errors.append({"project_id": project_id, "error": "Not found in management summary"})
-                    continue
+                    analysis = analyze_project_sync(project)
+                    analysis["analysis_mode"] = "legacy_fallback"
+                    analysis["fallback_reason"] = "management_project_summary_missing"
             else:
                 # Legacy approach
                 analysis = analyze_project_sync(project)

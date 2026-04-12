@@ -8,6 +8,8 @@ FIXTURE_DATA_DIR = PROJECT_ROOT / "data"
 RUNTIME_DIR = PROJECT_ROOT / ".runtime"
 DATASET_ROOT = RUNTIME_DIR / "datasets"
 DATA_DIR = DATASET_ROOT / "active"
+JOBS_DIR = RUNTIME_DIR / "jobs"
+ALERTS_DIR = RUNTIME_DIR / "alerts"
 CLEANED_DIR = PROJECT_ROOT / "data_cleaned"
 OUTPUT_DIR = PROJECT_ROOT / "output_summaries"
 PIPELINE_DIR = PROJECT_ROOT / "pipeline"
@@ -55,6 +57,8 @@ def ensure_runtime_dirs():
     """Create runtime directories used by uploads and pipeline outputs."""
     DATASET_ROOT.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    ALERTS_DIR.mkdir(parents=True, exist_ok=True)
     CLEANED_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     PIPELINE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

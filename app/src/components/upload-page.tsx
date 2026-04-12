@@ -2,10 +2,10 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle2, X, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar } from 'lucide-react'
 import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
-import { PipelineResult, Project, UploadResult } from '@/lib/types'
-import { runPipeline as runBackendPipeline, uploadDataset } from '@/lib/api'
+import { PipelineJob, PipelineResult, Project, UploadResult } from '@/lib/types'
+import { fetchHealth, uploadDataset, waitForPipelineJob } from '@/lib/api'
 import { InvestigateModal } from './investigate-modal'
 
 
@@ -71,91 +71,72 @@ const STEPS: StepDef[] = [
     ],
   },
   {
+    id: 'merge',
+    label: 'Merge & Enrich',
+    script: 'overspend_underbill_measure.py',
+    description: 'Blend billing, change orders, and RFI signals into project-level risk context',
+    duration: 2200,
+    logs: [
+      'Calculating earned vs. billed position by project...',
+      'Joining change-order exposure and commercial status...',
+      'Rolling RFIs into coordination-friction signals...',
+      'Writing enriched project-level dataset for flagging...',
+      '[DONE] Merge & enrichment complete in 2.1s',
+    ],
+  },
+  {
     id: 'flag',
     label: 'Portfolio Scan',
     script: '03_flag_projects.py',
-    description: 'Compute variances, identify margin erosion, rank by severity',
-    duration: 2200,
+    description: 'Compute variances, identify margin erosion, and rank the projects that need action',
+    duration: 1400,
     logs: [
       'Computing per-project cost actuals...',
-      'Formula: Labor Cost = (hours_st + hours_ot x 1.5) x hourly_rate x burden_multiplier',
-      'Joining actuals to contract budgets...',
       'Computing variance: actual_cost - budget_cost per project...',
       'Computing billing gap: pct_complete - pct_billed...',
       'Computing realized margin: (contract_value - actual_cost) / contract_value...',
-      'Flagging projects where realized_margin < bid_margin - 0.05...',
-      '-------------------------------------------',
-      '  CRITICAL (margin erosion > 8%): 4 projects',
-      '  WARNING  (margin erosion 5-8%): 3 projects',
-      '  WATCH    (margin erosion 3-5%): 1 project',
-      '  Total flagged: 8 / 47 projects',
-      '  Total exposure: $1.62M in overruns',
-      '-------------------------------------------',
-      'Ranking projects by severity score...',
-      '[DONE] Portfolio scan complete in 2.1s',
+      'Ranking the jobs that most need intervention...',
+      '[DONE] Portfolio scan complete in 1.4s',
     ],
   },
   {
     id: 'export',
     label: 'Export JSON',
     script: '04_export.py',
-    description: 'Export portfolio summary and per-project detail to JSON for the frontend',
-    duration: 1400,
+    description: 'Export structured project packets for the frontend and the LLM agents',
+    duration: 8500,
     logs: [
       'Serializing portfolio_summary.json...',
-      '  totalProjects: 47, totalValue: $62.8M',
-      '  avgBidMargin: 13.8%, avgRealizedMargin: 9.4%',
-      'Serializing flagged_projects.json (8 records)...',
-      'Creating output/project_details/ directory...',
-      'Exporting PRJ-2021-260.json...',
-      'Exporting PRJ-2022-118.json...',
-      'Exporting PRJ-2022-309.json...',
-      'Exporting PRJ-2023-044.json...',
-      'Exporting PRJ-2023-187.json...',
-      'Exporting PRJ-2023-291.json...',
-      'Exporting PRJ-2024-033.json...',
-      'Exporting PRJ-2024-112.json...',
-      '[DONE] 10 JSON files written to pipeline/output/',
+      'Serializing flagged_projects.json...',
+      'Building project packets for the LLM stage...',
+      '[DONE] JSON export complete in 8.3s',
     ],
   },
   {
     id: 'agent',
-    label: 'LLM Root Cause Analysis',
-    script: '05_extract_text.py + Claude',
-    description: 'Send each flagged project to Claude for root cause analysis and recovery recommendations',
-    duration: 8500,
+    label: 'Project Recovery Analysis',
+    script: 'run_batch_analysis.py',
+    description: 'Diagnose each flagged job, quantify recovery actions, and write project recovery memos',
+    duration: 9000,
     logs: [
-      'Loading flagged projects from pipeline/output/...',
-      'Building context bundles (cost data + field notes + COs + RFIs)...',
-      'Sending PRJ-2021-260 to Claude Haiku...',
-      '  [Riverside Medical] Root cause identified: BMS coordination + undocumented COs',
-      '  Recovery potential: $1.02M',
-      'Sending PRJ-2022-118 to Claude Haiku...',
-      '  [Greenfield Office] Root cause identified: Supply chain delay + GC rework',
-      '  Recovery potential: $1.32M',
-      'Sending PRJ-2022-309 to Claude Haiku...',
-      '  [Lakeview Schools] Root cause identified: Underbid OT + asbestos delays',
-      '  Recovery potential: $765K',
-      'Sending PRJ-2023-044 to Claude Haiku...',
-      '  [Harbor Logistics] Root cause identified: GC coordination failures',
-      '  Recovery potential: $295K',
-      'Sending PRJ-2023-187 to Claude Haiku...',
-      '  [Sunset Senior] Root cause identified: Design revisions at 60% complete',
-      '  Recovery potential: $717K',
-      'Sending PRJ-2023-291 to Claude Haiku...',
-      '  [Downtown Hotel] Root cause identified: Occupied building constraints',
-      '  Recovery potential: $330K',
-      'Sending PRJ-2024-033 to Claude Haiku...',
-      '  [Tech Campus] Root cause identified: Unscoped IT coordination overhead',
-      '  Recovery potential: $327K',
-      'Sending PRJ-2024-112 to Claude Haiku...',
-      '  [Municipal Library] Root cause identified: Prevailing wage audit gap',
-      '  Recovery potential: $148K',
-      '-------------------------------------------',
-      '  Total recoverable: ~$4.92M across 8 projects',
-      '  Analysis complete. Dashboard ready.',
-      '-------------------------------------------',
-      '[DONE] All 8 projects analyzed in 8.3s',
+      'Loading flagged projects from output_summaries/...',
+      'Building hybrid packets with metrics, field notes, RFIs, and change orders...',
+      'Running diagnosis + recommendation agents project by project...',
+      'Saving project_analyses.json for the action-first UI...',
+      '[DONE] Project recovery analysis complete',
+    ],
+  },
+  {
+    id: 'portfolio',
+    label: 'Portfolio Action Plan',
+    script: 'portfolio_optimizer.py',
+    description: 'Turn all project actions into a cash-focused weekly operating plan',
+    duration: 4200,
+    logs: [
+      'Flattening all project-level recovery actions...',
+      'Ranking actions by expected value, urgency, and owner capacity...',
+      'Producing this-week plan and cash flow projection...',
+      '[DONE] Portfolio action plan ready',
     ],
   },
 ]
@@ -215,8 +196,7 @@ export function UploadPage() {
 
   // Check system status on mount
   useEffect(() => {
-    fetch('/api/health')
-      .then(res => res.json())
+    fetchHealth()
       .then(() => setBackendConnected(true))
       .catch(() => setBackendConnected(false))
   }, [])
@@ -230,17 +210,42 @@ export function UploadPage() {
   const [redirecting, setRedirecting] = useState(false)
 
   const resetWorkflow = () => {
+    setFiles([])
+    setActualFiles([])
+    setUploadComplete(false)
+    setUploadStatus(null)
+    setUploadError(null)
     setPipelineStarted(false)
     setRunning(false)
     setDone(false)
     setRedirecting(false)
     setPipelineError(null)
+    setPipelineResult(null)
     setStatuses(STEPS.map(() => 'idle'))
     setVisibleLogs(STEPS.map(() => []))
   }
 
-  const runPipeline = async () => {
-    if (running || done || actualFiles.length === 0) return
+  const applyPipelineResult = useCallback((result: PipelineResult | null) => {
+    if (!result?.steps) return
+
+    setPipelineResult(result)
+    setStatuses(() =>
+      STEPS.map((_, index) => {
+        const backendStep = result.steps[index]
+        if (!backendStep) return 'idle'
+        if (backendStep.status === 'complete') return 'complete'
+        if (backendStep.status === 'error') return 'error'
+        if (backendStep.status === 'running') return 'running'
+        return 'idle'
+      }),
+    )
+    setVisibleLogs(() =>
+      STEPS.map((_, index) => result.steps[index]?.logs || []),
+    )
+  }, [])
+
+  const beginUploadAndPipeline = useCallback(async (selectedFiles: File[]) => {
+    if (running || done || selectedFiles.length === 0) return
 
     setUploadError(null)
     setPipelineError(null)
@@ -251,6 +256,13 @@ export function UploadPage() {
     runningRef.current = true
     setStatuses(STEPS.map(() => 'idle'))
     setVisibleLogs(STEPS.map(() => []))
+    setFiles(selectedFiles.map((file) => ({
+      name: file.name,
+      size: file.size,
+      type: file.type || 'application/octet-stream',
+    })))
+    setActualFiles(selectedFiles)
+    setUploadComplete(true)
 
     try {
       setStatuses((prev) => {
@@ -261,14 +273,14 @@ export function UploadPage() {
       setVisibleLogs((prev) => {
         const next = prev.map((lines) => [...lines])
         next[0] = [
-          `[UPLOAD] Uploading ${actualFiles.length} file(s) to the active dataset...`,
-          '[UPLOAD] Replacing previous runtime dataset and clearing stale outputs...',
+          `[UPLOAD] Uploading ${selectedFiles.length} file(s) to the active dataset...`,
+          '[UPLOAD] Replacing the active dataset, clearing stale outputs, and starting the backend job...',
         ]
         return next
       })
 
       setIsUploading(true)
-      const uploadResult = await uploadDataset(actualFiles)
+      const uploadResult = await uploadDataset(selectedFiles, true)
       setIsUploading(false)
       setUploadStatus(uploadResult)
 
@@ -276,31 +288,28 @@ export function UploadPage() {
         throw new Error(`Missing required files: ${uploadResult.missing_required.join(', ')}`)
       }
 
-      const result = await runBackendPipeline()
-      setPipelineResult(result)
-
-      for (let i = 0; i < result.steps.length && i < STEPS.length; i++) {
-        const backendStep = result.steps[i]
-        setStatuses((prev) => {
-          const next = [...prev]
-          next[i] = backendStep.status === 'complete'
-            ? 'complete'
-            : backendStep.status === 'error'
-              ? 'error'
-              : backendStep.status === 'running'
-                ? 'running'
-                : 'idle'
-          return next
-        })
-        setVisibleLogs((prev) => {
-          const next = prev.map((lines) => [...lines])
-          next[i] = backendStep.logs || []
-          return next
-        })
-        await new Promise((r) => setTimeout(r, 200))
+      const job = uploadResult.pipeline_job
+      if (!job) {
+        throw new Error('Upload succeeded, but the backend did not start a pipeline job.')
       }
 
-      if (result.status !== 'complete') {
+      const completedJob = await waitForPipelineJob(job.id, {
+        intervalMs: 1200,
+        onUpdate: (nextJob: PipelineJob) => {
+          if (nextJob.result) {
+            applyPipelineResult(nextJob.result)
+          }
+        },
+      })
+
+      if (!completedJob.result) {
+        throw new Error(completedJob.error || 'Pipeline job completed without a result payload.')
+      }
+
+      const result = completedJob.result
+      applyPipelineResult(result)
+
+      if (completedJob.status !== 'complete' || result.status !== 'complete') {
         const firstErrorStep = result.steps.find((step) => step.status === 'error')
         const errorMessage = firstErrorStep?.logs.find((line) => line.includes('[ERROR]')) || 'Pipeline execution failed'
         throw new Error(errorMessage)
@@ -332,8 +341,9 @@ export function UploadPage() {
       })
     } finally {
       setRunning(false)
+      runningRef.current = false
     }
-  }
+  }, [applyPipelineResult, done, router, running])
 
   const handleFiles = useCallback((fileList: FileList | null) => {
     if (!fileList) return
@@ -350,24 +360,8 @@ export function UploadPage() {
     setUploadError(null)
     setPipelineError(null)
     setUploadStatus(null)
-
-    const fileMap = new Map<string, File>()
-    for (const file of actualFiles) {
-      fileMap.set(file.name, file)
-    }
-    for (const file of selectedFiles) {
-      fileMap.set(file.name, file)
-    }
-
-    const mergedFiles = Array.from(fileMap.values())
-    setActualFiles(mergedFiles)
-    setFiles(mergedFiles.map((file) => ({
-      name: file.name,
-      size: file.size,
-      type: file.type || 'application/octet-stream',
-    })))
-    setUploadComplete(mergedFiles.length > 0)
-  }, [actualFiles])
+    beginUploadAndPipeline(selectedFiles)
+  }, [beginUploadAndPipeline])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -539,8 +533,8 @@ export function UploadPage() {
                   <div className="flex flex-col items-center gap-4">
                     <CheckCircle2 className="w-12 h-12 text-emerald-500" />
                     <div>
-                      <p className="text-foreground font-medium">Files queued for analysis</p>
-                      <p className="text-muted-foreground text-sm mt-1">Click to add more files or drag and drop before analyzing</p>
+                      <p className="text-foreground font-medium">Upload accepted</p>
+                      <p className="text-muted-foreground text-sm mt-1">The backend will start the pipeline automatically.</p>
                     </div>
                   </div>
                 ) : (
@@ -603,21 +597,6 @@ export function UploadPage() {
                       Optional files missing for degraded mode: {uploadStatus.missing_optional.join(', ')}
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Analyze button */}
-              {files.length > 0 && (
-                <div className="flex justify-center">
-                  <button
-                    onClick={runPipeline}
-                    disabled={!backendConnected || running}
-                    className="flex items-center gap-3 px-8 py-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-semibold text-lg shadow-lg shadow-primary/20"
-                  >
-                    <Zap className="w-5 h-5" />
-                    Analyze Financial Data
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
                 </div>
               )}
 

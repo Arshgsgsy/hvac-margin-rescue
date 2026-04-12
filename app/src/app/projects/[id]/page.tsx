@@ -35,7 +35,7 @@ export default function ProjectPage() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0f1e' }}>
         <div className="text-center">
           <p className="text-red-400 mb-2">Project not found</p>
-          <Link href="/" className="text-blue-400 text-sm">Back to portfolio</Link>
+          <Link href="/dashboard" className="text-blue-400 text-sm">Back to recovery plan</Link>
         </div>
       </div>
     )
@@ -45,11 +45,11 @@ export default function ProjectPage() {
     <div className="min-h-screen" style={{ background: '#0a0f1e' }}>
       <header className="border-b" style={{ borderColor: '#1e3a5f', background: '#0d1526' }}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Link href="/" className="text-sm flex items-center gap-1.5" style={{ color: '#64748b' }}>
+          <Link href="/dashboard" className="text-sm flex items-center gap-1.5" style={{ color: '#64748b' }}>
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Portfolio
+            Recovery plan
           </Link>
           <span style={{ color: '#1e3a5f' }}>/</span>
           <span className="text-white font-medium">{project.id}</span>

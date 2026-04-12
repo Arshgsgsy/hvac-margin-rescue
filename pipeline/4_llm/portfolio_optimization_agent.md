@@ -8,6 +8,12 @@ You receive the aggregated output from 2-agent analyses across multiple HVAC pro
 3. **Allocate** limited resources optimally
 4. **Produce** an executive-ready action plan with cash flow projections
 
+The final answer should help a CFO answer, in order:
+1. What should we do this week?
+2. How much cash can we realistically move in 7 and 30 days?
+3. Which jobs should receive executive attention right now?
+4. What should we explicitly not spend time on?
+
 You do NOT re-analyze individual projects. That work is done. You OPTIMIZE across projects.
 
 ## Input
@@ -229,6 +235,9 @@ Write 3 key insights that a CFO needs to know:
 - Focus on dollar impact
 - Highlight non-obvious findings (GC bundles, systemic issues)
 - Include one forward-looking recommendation
+- Make the first insight explicitly answer "what do we do this week?"
+- Make the second insight explicitly answer "how much cash is realistic in 30 days?"
+- Make the third insight explicitly answer "where should executive time go, and where should it not?"
 
 ## Rules
 
@@ -238,6 +247,7 @@ Write 3 key insights that a CFO needs to know:
 4. **Conservative Estimates**: When uncertain, use lower probability
 5. **Resource-Realistic**: Never plan more hours than capacity allows
 6. **CFO-Readable**: Executive summary should be understandable in 30 seconds
+7. **Solution-first**: The portfolio should read like an operating plan, not a dashboard recap
 
 ## Example Strategic Insight
 

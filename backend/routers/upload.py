@@ -4,7 +4,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Response
 from config import (
     DATA_DIR,
     DATASET_ROOT,
@@ -16,6 +16,7 @@ from config import (
     get_available_files,
     replace_active_dataset,
 )
+from pipeline_jobs import enqueue_pipeline_job, get_active_pipeline_job, get_pipeline_job_payload
 
 router = APIRouter()
 
@@ -61,11 +62,26 @@ REQUIRED_COLUMNS_BY_FILE = {
 
 
 @router.post("/upload")
-async def upload_csvs(files: list[UploadFile] = File(...)):
+async def upload_csvs(
+    response: Response,
+    files: list[UploadFile] = File(...),
+    auto_run: bool = True,
+):
     ensure_runtime_dirs()
 
     if not files:
         raise HTTPException(400, "No files uploaded")
+
+    active_job = get_active_pipeline_job()
+    if active_job:
+        raise HTTPException(
+            409,
+            {
+                "error": "Pipeline already running",
+                "message": "Wait for the current pipeline run to finish before replacing the active dataset.",
+                "job": get_pipeline_job_payload(active_job["id"]) or active_job,
+            },
+        )
 
     staging_dir = Path(
         tempfile.mkdtemp(prefix="dataset_", dir=str(DATASET_ROOT))
@@ -88,7 +104,7 @@ async def upload_csvs(files: list[UploadFile] = File(...)):
             pass
 
         file_status = get_available_files()
-        return {
+        payload = {
             "status": "ok",
             "files": accepted,
             "available_files": file_status["available"],
@@ -97,6 +113,30 @@ async def upload_csvs(files: list[UploadFile] = File(...)):
             "can_run_pipeline": file_status["can_run_pipeline"],
             "active_data_dir": str(DATA_DIR),
         }
+
+        if auto_run and file_status["can_run_pipeline"]:
+            try:
+                job = enqueue_pipeline_job(
+                    available_files=file_status["available"],
+                    trigger="upload",
+                )
+            except RuntimeError as exc:
+                active_job = get_active_pipeline_job()
+                raise HTTPException(
+                    409,
+                    {
+                        "error": "Pipeline already running",
+                        "message": str(exc),
+                        "job": get_pipeline_job_payload(active_job["id"]) if active_job else None,
+                    },
+                ) from exc
+
+            payload["pipeline_job"] = get_pipeline_job_payload(job["id"])
+            response.status_code = 202
+        else:
+            payload["pipeline_job"] = None
+
+        return payload
     except HTTPException:
         shutil.rmtree(staging_dir, ignore_errors=True)
         raise

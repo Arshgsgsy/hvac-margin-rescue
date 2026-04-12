@@ -15,8 +15,8 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { formatCurrency, formatPercent, getSortedByPriority } from '@/lib/data'
-import { PortfolioSummary, PipelineStep, Project } from '@/lib/types'
-import { uploadFiles, runPipeline } from '@/lib/api'
+import { PipelineJob, PortfolioSummary, PipelineStep, Project } from '@/lib/types'
+import { runPipeline, uploadFiles, waitForPipelineJob } from '@/lib/api'
 
 interface Props {
   portfolio: PortfolioSummary | null
@@ -44,6 +44,14 @@ export function Tab5Pipeline({ portfolio, projects, onPipelineComplete }: Props)
 
   const top5 = useMemo(() => getSortedByPriority(projects).slice(0, 5), [projects])
 
+  const applyJob = useCallback((job: PipelineJob) => {
+    if (job.result?.steps) {
+      setSteps(job.result.steps)
+    } else if (job.steps) {
+      setSteps(job.steps)
+    }
+  }, [])
+
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
     setUploading(true)
@@ -51,11 +59,28 @@ export function Tab5Pipeline({ portfolio, projects, onPipelineComplete }: Props)
     try {
       const result = await uploadFiles(files)
       setUploadedFiles(result.files)
+      if (result.pipeline_job) {
+        setRunning(true)
+        applyJob(result.pipeline_job)
+        const completedJob = await waitForPipelineJob(result.pipeline_job.id, {
+          intervalMs: 1200,
+          onUpdate: applyJob,
+        })
+        applyJob(completedJob)
+        setDone(completedJob.status === 'complete' && completedJob.result?.status === 'complete')
+        if (completedJob.status === 'complete' && completedJob.result?.status === 'complete') {
+          onPipelineComplete()
+        } else {
+          setError('Pipeline completed with errors. Check step logs.')
+        }
+        setRunning(false)
+      }
     } catch (e: any) {
       setError(`Upload failed: ${e.message}`)
+      setRunning(false)
     }
     setUploading(false)
-  }, [])
+  }, [applyJob, onPipelineComplete])
 
   const handleRunPipeline = useCallback(async () => {
     if (running || done) return

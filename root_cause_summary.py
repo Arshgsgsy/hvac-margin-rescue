@@ -1,89 +1,168 @@
-import pandas as pd
-import numpy as np
+import json
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
 
 BASE = Path("output_summaries")
 
-project_health_file = BASE / "project_health.csv"
-project_risk_file = BASE / "project_risk_scores.csv"
-change_summary_file = BASE / "change_summary.csv"
-if not change_summary_file.exists():
-    change_summary_file = BASE / "change_summary(1).csv"
-
-rfi_summary_file = BASE / "rfi_summary.csv"
-labor_vs_budget_file = BASE / "labor_vs_budget.csv"
-material_vs_budget_file = BASE / "material_vs_budget.csv"
-
-output_file = BASE / "management_project_summary.csv"
+PROJECT_HEALTH_FILE = BASE / "project_health.csv"
+PROJECT_RISK_FILE = BASE / "project_risk_scores.csv"
+CHANGE_SUMMARY_FILE = BASE / "change_summary.csv"
+RFI_SUMMARY_FILE = BASE / "rfi_summary.csv"
+LABOR_VS_BUDGET_FILE = BASE / "labor_vs_budget.csv"
+MATERIAL_VS_BUDGET_FILE = BASE / "material_vs_budget.csv"
+FLAGGED_PROJECTS_FILE = BASE / "flagged_projects.json"
+OUTPUT_FILE = BASE / "management_project_summary.csv"
 
 
-def safe_divide(a, b):
+def _load_csv(path: Path, *, required: bool = False, columns: list[str] | None = None) -> pd.DataFrame:
+    if path.exists():
+        return pd.read_csv(path, low_memory=False)
+    if required:
+        raise FileNotFoundError(f"Required input not found: {path}")
+    return pd.DataFrame(columns=columns or [])
+
+
+def _safe_divide(a, b):
     a = pd.to_numeric(a, errors="coerce")
     b = pd.to_numeric(b, errors="coerce")
     return np.where((b == 0) | pd.isna(b), np.nan, a / b)
 
 
-# =========================
-# LOAD
-# =========================
-project_health = pd.read_csv(project_health_file)
-project_risk = pd.read_csv(project_risk_file)
-change_summary = pd.read_csv(change_summary_file)
-rfi_summary = pd.read_csv(rfi_summary_file)
-labor_vs_budget = pd.read_csv(labor_vs_budget_file)
-material_vs_budget = pd.read_csv(material_vs_budget_file)
+def _json_trigger_summary() -> pd.DataFrame:
+    if not FLAGGED_PROJECTS_FILE.exists():
+        return pd.DataFrame(
+            columns=[
+                "project_id",
+                "alert_class",
+                "trigger_score",
+                "primary_trigger",
+                "supporting_triggers",
+                "fired_triggers",
+                "why_now",
+            ]
+        )
+
+    try:
+        payload = json.loads(FLAGGED_PROJECTS_FILE.read_text())
+    except json.JSONDecodeError:
+        payload = []
+
+    rows = []
+    for record in payload:
+        primary = record.get("primary_trigger") or {}
+        supporting = record.get("supporting_triggers") or []
+        fired = record.get("fired_triggers") or []
+        rows.append(
+            {
+                "project_id": record.get("project_id"),
+                "alert_class": record.get("alert_class"),
+                "trigger_score": record.get("trigger_score"),
+                "primary_trigger": primary.get("label") if isinstance(primary, dict) else primary,
+                "supporting_triggers": "; ".join(
+                    item.get("label", "") if isinstance(item, dict) else str(item)
+                    for item in supporting
+                    if (item.get("label") if isinstance(item, dict) else str(item))
+                ),
+                "fired_triggers": "; ".join(
+                    item.get("label", "") if isinstance(item, dict) else str(item)
+                    for item in fired
+                    if (item.get("label") if isinstance(item, dict) else str(item))
+                ),
+                "why_now": record.get("why_now"),
+            }
+        )
+
+    return pd.DataFrame(rows)
 
 
-# =========================
-# LABOR SUMMARY
-# =========================
-labor_summary = (
-    labor_vs_budget.groupby("project_id", as_index=False)
-    .agg(
-        labor_actual_cost=("actual_labor_cost", "sum"),
-        labor_budget_cost=("budget_labor_cost", "sum"),
-        labor_variance=("labor_variance", "sum"),
-        labor_avg_pct_overrun=("pct_overrun", "mean"),
-        labor_ot_hours=("total_hours_ot", "sum"),
-        labor_st_hours=("total_hours_st", "sum")
+def _group_or_empty(df: pd.DataFrame, group_specs: dict, derived: dict | None = None) -> pd.DataFrame:
+    if df.empty:
+        columns = ["project_id"] + list(group_specs.keys()) + list((derived or {}).keys())
+        return pd.DataFrame(columns=columns)
+
+    grouped = df.groupby("project_id", as_index=False).agg(**group_specs)
+    if derived:
+        for column, values in derived.items():
+            grouped[column] = values(grouped)
+    return grouped
+
+
+project_health = _load_csv(PROJECT_HEALTH_FILE, required=True)
+project_risk = _load_csv(PROJECT_RISK_FILE, required=True)
+change_summary = _load_csv(
+    CHANGE_SUMMARY_FILE,
+    columns=["project_id", "total_change_orders", "approved_value", "rejected_value"],
+)
+rfi_summary = _load_csv(
+    RFI_SUMMARY_FILE,
+    columns=["project_id", "total_rfis", "rfis_linked_to_cos", "rfi_to_co_ratio"],
+)
+labor_vs_budget = _load_csv(
+    LABOR_VS_BUDGET_FILE,
+    columns=[
+        "project_id",
+        "actual_labor_cost",
+        "budget_labor_cost",
+        "labor_variance",
+        "pct_overrun",
+        "total_hours_ot",
+        "total_hours_st",
+    ],
+)
+material_vs_budget = _load_csv(
+    MATERIAL_VS_BUDGET_FILE,
+    columns=[
+        "project_id",
+        "actual_material_cost",
+        "budget_material_cost",
+        "material_variance",
+        "pct_overrun",
+    ],
+)
+trigger_summary = _json_trigger_summary()
+
+labor_summary = _group_or_empty(
+    labor_vs_budget,
+    group_specs={
+        "labor_actual_cost": ("actual_labor_cost", "sum"),
+        "labor_budget_cost": ("budget_labor_cost", "sum"),
+        "labor_variance": ("labor_variance", "sum"),
+        "labor_avg_pct_overrun": ("pct_overrun", "mean"),
+        "labor_ot_hours": ("total_hours_ot", "sum"),
+        "labor_st_hours": ("total_hours_st", "sum"),
+    },
+)
+if not labor_summary.empty:
+    labor_summary["labor_burn_ratio"] = _safe_divide(
+        labor_summary["labor_actual_cost"],
+        labor_summary["labor_budget_cost"],
     )
-)
-
-labor_summary["labor_burn_ratio"] = safe_divide(
-    labor_summary["labor_actual_cost"],
-    labor_summary["labor_budget_cost"]
-)
-
-labor_summary["labor_ot_share"] = safe_divide(
-    labor_summary["labor_ot_hours"],
-    labor_summary["labor_ot_hours"] + labor_summary["labor_st_hours"]
-)
-
-
-# =========================
-# MATERIAL SUMMARY
-# =========================
-material_summary = (
-    material_vs_budget.groupby("project_id", as_index=False)
-    .agg(
-        material_actual_cost=("actual_material_cost", "sum"),
-        material_budget_cost=("budget_material_cost", "sum"),
-        material_variance=("material_variance", "sum"),
-        material_avg_pct_overrun=("pct_overrun", "mean")
+    labor_summary["labor_ot_share"] = _safe_divide(
+        labor_summary["labor_ot_hours"],
+        labor_summary["labor_ot_hours"] + labor_summary["labor_st_hours"],
     )
+
+material_summary = _group_or_empty(
+    material_vs_budget,
+    group_specs={
+        "material_actual_cost": ("actual_material_cost", "sum"),
+        "material_budget_cost": ("budget_material_cost", "sum"),
+        "material_variance": ("material_variance", "sum"),
+        "material_avg_pct_overrun": ("pct_overrun", "mean"),
+    },
 )
+if not material_summary.empty:
+    material_summary["material_burn_ratio"] = _safe_divide(
+        material_summary["material_actual_cost"],
+        material_summary["material_budget_cost"],
+    )
 
-material_summary["material_burn_ratio"] = safe_divide(
-    material_summary["material_actual_cost"],
-    material_summary["material_budget_cost"]
-)
-
-
-# =========================
-# KEEP IMPORTANT COLUMNS
-# =========================
 health_cols = [
-    c for c in [
+    column
+    for column in [
         "project_id",
         "project_name",
         "gc_name",
@@ -93,98 +172,112 @@ health_cols = [
         "actual_tracked_cost",
         "cumulative_billed",
         "pct_billed",
-        "realized_margin_pct"
-    ] if c in project_health.columns
+        "pct_complete",
+        "billing_gap_pct",
+        "realized_margin_pct",
+        "approved_co_pct",
+        "rejected_co_pct",
+        "pending_co_pct",
+        "pending_co_value",
+        "co_pending_count",
+        "max_open_rfi_age",
+        "overtime_spike",
+        "burn_rate_acceleration",
+        "crew_size_spike",
+        "forecast_to_complete_trend",
+        "budget_coverage",
+    ]
+    if column in project_health.columns
 ]
 project_health = project_health[health_cols].copy()
 
 risk_cols = [
-    c for c in [
+    column
+    for column in [
         "project_id",
         "risk_score",
         "risk_level",
-        "main_issue"
-    ] if c in project_risk.columns
+        "main_issue",
+    ]
+    if column in project_risk.columns
 ]
 project_risk = project_risk[risk_cols].copy()
 
 change_cols = [
-    c for c in [
+    column
+    for column in [
         "project_id",
         "total_change_orders",
         "approved_value",
-        "rejected_value"
-    ] if c in change_summary.columns
+        "rejected_value",
+    ]
+    if column in change_summary.columns
 ]
 change_summary = change_summary[change_cols].copy()
 
 rfi_cols = [
-    c for c in [
+    column
+    for column in [
         "project_id",
         "total_rfis",
         "rfis_linked_to_cos",
-        "rfi_to_co_ratio"
-    ] if c in rfi_summary.columns
+        "rfi_to_co_ratio",
+    ]
+    if column in rfi_summary.columns
 ]
 rfi_summary = rfi_summary[rfi_cols].copy()
 
-
-# =========================
-# MERGE
-# =========================
 df = project_health.merge(project_risk, on="project_id", how="left")
 df = df.merge(change_summary, on="project_id", how="left")
 df = df.merge(rfi_summary, on="project_id", how="left")
 df = df.merge(labor_summary, on="project_id", how="left")
 df = df.merge(material_summary, on="project_id", how="left")
+df = df.merge(trigger_summary, on="project_id", how="left")
 
+if "billing_gap_pct" not in df.columns and {"adjusted_contract", "cumulative_billed"} <= set(df.columns):
+    df["billing_gap"] = df["adjusted_contract"] - df["cumulative_billed"]
+    df["billing_gap_pct"] = _safe_divide(df["billing_gap"], df["adjusted_contract"])
+else:
+    df["billing_gap"] = df.get("adjusted_contract", 0) - df.get("cumulative_billed", 0)
 
-# =========================
-# DERIVED METRICS
-# =========================
-df["billing_gap"] = df["adjusted_contract"] - df["cumulative_billed"]
-df["billing_gap_pct"] = safe_divide(df["billing_gap"], df["adjusted_contract"])
+if "approved_co_pct" not in df.columns and {"approved_value", "original_contract_value"} <= set(df.columns):
+    df["approved_co_pct"] = _safe_divide(df["approved_value"], df["original_contract_value"])
 
-df["approved_co_pct"] = safe_divide(df["approved_value"], df["original_contract_value"])
-df["rejected_co_pct"] = safe_divide(df["rejected_value"], df["original_contract_value"])
+if "rejected_co_pct" not in df.columns and {"rejected_value", "original_contract_value"} <= set(df.columns):
+    df["rejected_co_pct"] = _safe_divide(df["rejected_value"], df["original_contract_value"])
 
-df["cost_vs_budget"] = safe_divide(df["actual_tracked_cost"], df["total_budget"])
+df["cost_vs_budget"] = _safe_divide(df["actual_tracked_cost"], df["total_budget"])
 
-
-# =========================
-# CLEANUP
-# Clamp fields that should not be negative
-# =========================
-for col in [
+for column in [
     "billing_gap_pct",
     "approved_co_pct",
     "rejected_co_pct",
+    "pending_co_pct",
     "labor_burn_ratio",
     "material_burn_ratio",
     "labor_avg_pct_overrun",
-    "material_avg_pct_overrun"
+    "material_avg_pct_overrun",
 ]:
-    if col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce").clip(lower=0)
+    if column in df.columns:
+        df[column] = pd.to_numeric(df[column], errors="coerce").clip(lower=0)
 
-for col in [
+for column in [
     "realized_margin_pct",
     "cost_vs_budget",
     "billing_gap_pct",
     "approved_co_pct",
     "rejected_co_pct",
+    "pending_co_pct",
     "labor_burn_ratio",
     "material_burn_ratio",
     "labor_avg_pct_overrun",
-    "material_avg_pct_overrun"
+    "material_avg_pct_overrun",
+    "forecast_to_complete_trend",
 ]:
-    if col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce").round(3)
+    if column in df.columns:
+        df[column] = pd.to_numeric(df[column], errors="coerce").round(3)
 
 
-# =========================
-# SIMPLE MANAGEMENT CAUSE
-# =========================
 def classify_cause(row):
     billing_gap_pct = row.get("billing_gap_pct")
     rejected_co_pct = row.get("rejected_co_pct")
@@ -225,7 +318,8 @@ def evidence_text(row):
     if cause == "Material / procurement":
         return f"Material avg overrun is {row['material_avg_pct_overrun']:.1%}"
     if cause == "Coordination / RFIs":
-        return f"Project has {int(row['total_rfis']) if pd.notna(row['total_rfis']) else 0} RFIs"
+        total_rfis = int(row["total_rfis"]) if pd.notna(row.get("total_rfis")) else 0
+        return f"Project has {total_rfis} RFIs"
     if cause == "Margin erosion / review":
         return f"Realized margin is {row['realized_margin_pct']:.1%}"
     return "No single issue clearly dominates"
@@ -240,7 +334,7 @@ def recommended_action(cause):
         "Material / procurement": "Review buyout, deliveries, and material budgeting",
         "Coordination / RFIs": "Escalate drawing review, RFI aging, and PM coordination",
         "Margin erosion / review": "Do full project review to isolate cost and recovery issues",
-        "Mixed / monitor": "Monitor project and review multiple risk signals"
+        "Mixed / monitor": "Monitor project and review multiple risk signals",
     }
     return mapping.get(cause, "Review project")
 
@@ -249,67 +343,67 @@ df["management_cause"] = df.apply(classify_cause, axis=1)
 df["evidence"] = df.apply(evidence_text, axis=1)
 df["recommended_action"] = df["management_cause"].map(recommended_action)
 
-
-# =========================
-# SEVERITY
-# =========================
 score = (
-    (df["billing_gap_pct"] > 0.15).fillna(False).astype(int) * 3 +
-    (df["rejected_co_pct"] > 0.03).fillna(False).astype(int) * 3 +
-    (df["approved_co_pct"] > 0.10).fillna(False).astype(int) * 2 +
-    (df["labor_burn_ratio"] > 1.10).fillna(False).astype(int) * 2 +
-    (df["material_avg_pct_overrun"] > 0.10).fillna(False).astype(int) * 2 +
-    (df["total_rfis"] > 50).fillna(False).astype(int) * 1 +
-    (df["realized_margin_pct"] < 0).fillna(False).astype(int) * 3
+    (df["billing_gap_pct"] > 0.15).fillna(False).astype(int) * 3
+    + (df["rejected_co_pct"] > 0.03).fillna(False).astype(int) * 3
+    + (df["approved_co_pct"] > 0.10).fillna(False).astype(int) * 2
+    + (df["labor_burn_ratio"] > 1.10).fillna(False).astype(int) * 2
+    + (df["material_avg_pct_overrun"] > 0.10).fillna(False).astype(int) * 2
+    + (df["total_rfis"] > 50).fillna(False).astype(int) * 1
+    + (df["realized_margin_pct"] < 0).fillna(False).astype(int) * 3
 )
-
 df["severity_score"] = score
-
 df["severity"] = pd.cut(
     df["severity_score"],
     bins=[-1, 1, 3, 6, 20],
-    labels=["Low", "Moderate", "High", "Critical"]
+    labels=["Low", "Moderate", "High", "Critical"],
 )
 
-
-# =========================
-# FINAL OUTPUT
-# =========================
 final_cols = [
     "project_id",
     "project_name",
     "gc_name",
     "risk_level",
+    "risk_score",
     "main_issue",
+    "alert_class",
+    "trigger_score",
+    "primary_trigger",
+    "supporting_triggers",
+    "fired_triggers",
+    "why_now",
     "realized_margin_pct",
     "cost_vs_budget",
     "billing_gap_pct",
     "approved_co_pct",
     "rejected_co_pct",
+    "pending_co_pct",
     "total_rfis",
+    "max_open_rfi_age",
     "labor_burn_ratio",
     "labor_avg_pct_overrun",
     "material_avg_pct_overrun",
+    "overtime_spike",
+    "burn_rate_acceleration",
+    "crew_size_spike",
+    "forecast_to_complete_trend",
     "management_cause",
     "evidence",
     "recommended_action",
-    "severity"
+    "severity",
 ]
-
-final_cols = [c for c in final_cols if c in df.columns]
+final_cols = [column for column in final_cols if column in df.columns]
 final = df[final_cols].copy()
 
 severity_order = {"Critical": 3, "High": 2, "Moderate": 1, "Low": 0}
 final["_severity_rank"] = final["severity"].astype(str).map(severity_order)
-
-sort_cols = [c for c in ["_severity_rank", "realized_margin_pct"] if c in final.columns]
-ascending = [False, True][:len(sort_cols)]
-
+sort_cols = [column for column in ["_severity_rank", "trigger_score", "realized_margin_pct"] if column in final.columns]
+ascending = [False, False, True][: len(sort_cols)]
 final = final.sort_values(by=sort_cols, ascending=ascending).drop(columns=["_severity_rank"])
 
-final.to_csv(output_file, index=False)
+final.to_csv(OUTPUT_FILE, index=False)
 
-print(f"Created: {output_file}")
+print(f"Created: {OUTPUT_FILE}")
 print(final.head(15))
 
 print("\nManagement cause counts:")

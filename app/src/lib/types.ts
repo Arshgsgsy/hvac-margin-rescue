@@ -49,12 +49,12 @@ export interface ChangeOrder {
   description: string
   amount: number
   status: string
-  reason_category: string
-  reasonCategory: string
-  co_number: string
-  costIncurred: number
-  billedToClient: boolean
-  marginImpact: number
+  reason_category?: string
+  reasonCategory?: string
+  co_number?: string
+  costIncurred?: number
+  billedToClient?: boolean
+  marginImpact?: number
 }
 
 export interface RFI {
@@ -62,16 +62,60 @@ export interface RFI {
   status: string
   days_open: number
   description: string
-  priority: string
-  cost_impact: boolean
-  daysOpen: number
+  priority?: string
+  cost_impact?: boolean
+  daysOpen?: number
+}
+
+export interface RootCause {
+  label: string
+  category?: string
+  impact_dollars?: number | null
+  confidence?: number | null
+  evidence?: string[]
+  counter_evidence?: string[]
+  summary?: string
 }
 
 export interface RecoveryAction {
+  id?: string
+  priority?: number
+  action: string
   description: string
+  owner?: string
+  financial_logic?: string | null
+  estimated_recovery_dollars?: number | null
   amount: number
-  priority: string
-  category: string
+  urgency?: 'immediate' | 'this_week' | 'this_month' | 'ongoing'
+  effort?: 'low' | 'medium' | 'high' | null
+  time_to_cash_days?: number | null
+  linked_root_cause?: string | null
+  cost_to_execute_hours?: number | null
+  expected_value?: number | null
+  recovery_type?: 'billing' | 'change_order' | 'retention' | 'operational' | 'claim' | string | null
+  probability_of_success?: number | null
+  blocking_items?: string[]
+  evidence_refs?: string[]
+}
+
+export interface ProfitImpact {
+  current_margin_dollars: number
+  projected_margin_dollars: number
+  net_improvement: number
+}
+
+export interface RecoveryByTiming {
+  immediate: number | null
+  near_term: number | null
+  long_term: number | null
+}
+
+export interface ProjectMoneyBrief {
+  project_mode?: string | null
+  cash_this_week?: number | null
+  cash_in_30_days?: number | null
+  total_recoverable?: number | null
+  break_even_recovery_needed?: number | null
 }
 
 export interface Project {
@@ -79,49 +123,110 @@ export interface Project {
   id: string
   name: string
   sector: string
+  gc_name?: string | null
   contract_value: number
   bid_margin: number
   realized_margin: number
   margin_delta: number
   severity: Severity
+  alert_class?: 'hard_alert' | 'watch_signal' | null
+  trigger_score?: number
+  primary_trigger?: Record<string, any> | null
+  supporting_triggers?: Record<string, any>[]
+  fired_triggers?: Record<string, any>[]
+  why_now?: string | null
+  alert_state?: 'new' | 'escalated' | 'worsened' | 'ongoing' | null
+  should_realert?: boolean
+  project_stage?: string | null
+  money_at_risk?: number
+  realized_margin_dollars?: number
+  current_margin_dollars?: number
+  estimated_cost_total?: number
+  actual_cost_total?: number
+  retention_held?: number
   labor_overrun: number
   material_overrun: number
   billing_gap: number
+  co_approved_value?: number
+  co_pending_value?: number
+  co_rejected_value?: number
   labor_cost: CostBreakdown
   material_cost: CostBreakdown
   billing_status: { percent_complete: number; percent_billed: number }
-  contractValue: number
-  bidMargin: number
-  realizedMargin: number
-  marginDelta: number
-  laborOverrun: number
-  materialOverrun: number
-  billingGap: number
-  laborCost: CostBreakdown
-  materialCost: CostBreakdown
-  billingStatus: { percentComplete: number; percentBilled: number }
+  contractValue?: number
+  bidMargin?: number
+  realizedMargin?: number
+  marginDelta?: number
+  laborOverrun?: number
+  materialOverrun?: number
+  billingGap?: number
+  laborCost?: CostBreakdown
+  materialCost?: CostBreakdown
+  billingStatus?: { percentComplete: number; percentBilled: number }
+  headline: string | null
   root_cause: string | null
-  root_causes: string[] | null
-  rootCause: string | null
-  recovery_actions: RecoveryAction[] | null
-  recoveryActions: RecoveryAction[] | null
+  root_causes: RootCause[]
+  rootCause?: string | null
+  recovery_actions: RecoveryAction[]
+  recoveryActions?: RecoveryAction[]
+  primary_action?: RecoveryAction | null
+  next_actions?: RecoveryAction[]
+  project_mode?: string | null
+  executive_brief?: string | null
   field_note_summary: string | null
-  fieldNoteSummary: string | null
+  fieldNoteSummary?: string | null
+  forecast_if_no_action?: string | null
+  forecast_with_action?: string | null
+  no_action_risk?: string | null
+  action_outlook?: string | null
+  total_recoverable_estimate: number | null
+  profit_impact?: ProfitImpact | null
+  recovery_by_timing?: RecoveryByTiming | null
+  break_even_recovery_needed?: number | null
+  analysis_confidence: number | null
+  do_not_pursue?: Array<string | { reason?: string; action?: string }>
+  blocking_items?: string[]
+  money_brief?: ProjectMoneyBrief | null
   change_orders: ChangeOrder[]
-  changeOrders: ChangeOrder[]
+  changeOrders?: ChangeOrder[]
   rfis: RFI[]
   sov_lines: SOVLine[]
-  sovLines: SOVLine[]
+  sovLines?: SOVLine[]
   labor_by_week: LaborWeek[]
-  laborByWeek: LaborWeek[]
+  laborByWeek?: LaborWeek[]
   material_deliveries: MaterialDelivery[]
-  materialDeliveries: MaterialDelivery[]
+  materialDeliveries?: MaterialDelivery[]
   billing_history: BillingPeriod[]
-  billingHistory: BillingPeriod[]
+  billingHistory?: BillingPeriod[]
   rfi_by_week: RFIWeek[]
-  total_recoverable_estimate: number | null
-  analysis_confidence: string | null
-  headline: string | null
+  llm_financial_snapshot?: Record<string, any> | null
+  recoverability_summary?: Record<string, any> | null
+}
+
+export interface ThisWeekPlanAction {
+  day: string
+  project_id: string
+  project_name?: string
+  action_summary: string
+  owner: string
+  hours_required: number
+  expected_recovery: number
+}
+
+export interface PortfolioBrief {
+  executive_brief: string
+  optimization_available: boolean
+  cash_this_week: number
+  cash_in_30_days: number
+  achievable_recovery: number
+  theoretical_recovery: number
+  top_actions: Array<RecoveryAction & { project_id?: string; project_name?: string; severity?: Severity }>
+  this_week_plan: ThisWeekPlanAction[]
+  owner_plan: Array<{ owner: string; hours: number }>
+  projects_requiring_exec_attention: Project[]
+  projects_to_deprioritize: Array<Record<string, any>>
+  strategic_insights: Array<Record<string, any>>
+  biggest_blockers: string[]
 }
 
 export interface PortfolioSummary {
@@ -133,14 +238,16 @@ export interface PortfolioSummary {
   flagged_count: number
   critical_count: number
   total_exposure: number
-  total_recoverable: number
-  totalProjects: number
-  totalValue: number
-  avgBidMargin: number
-  avgRealizedMargin: number
-  flaggedCount: number
-  criticalCount: number
-  totalExposure: number
+  total_recoverable?: number
+  optimization_available?: boolean
+  brief?: PortfolioBrief
+  totalProjects?: number
+  totalValue?: number
+  avgBidMargin?: number
+  avgRealizedMargin?: number
+  flaggedCount?: number
+  criticalCount?: number
+  totalExposure?: number
   data_availability: {
     available_features: string[]
     missing_features: string[]
@@ -171,6 +278,21 @@ export interface PipelineResult {
   flagged_projects?: Array<{ project_id: string; project_name: string; severity: Severity }>
 }
 
+export interface PipelineJob {
+  id: string
+  kind: string
+  trigger: string
+  status: 'queued' | 'running' | 'complete' | 'error'
+  created_at: string
+  updated_at: string
+  started_at?: string | null
+  completed_at?: string | null
+  error?: string | null
+  metadata?: Record<string, any>
+  result?: PipelineResult | null
+  steps?: PipelineStep[]
+}
+
 export interface UploadResult {
   status: string
   files: { name: string; size_bytes: number }[]
@@ -179,6 +301,11 @@ export interface UploadResult {
   missing_optional: string[]
   can_run_pipeline: boolean
   active_data_dir: string
+  pipeline_job?: PipelineJob | null
+}
+
+export interface HealthStatus {
+  status: string
 }
 
 export interface ChatMessage {

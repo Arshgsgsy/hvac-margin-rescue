@@ -43,36 +43,59 @@ def clear_csv_cache():
     _csv_cache.clear()
 
 
+def _row_value(row: pd.Series, column: str, default=None):
+    if column not in row.index or pd.isna(row[column]):
+        return default
+    return row[column]
+
+
 def get_management_summary(project_id: str) -> dict | None:
     """Get pre-computed metrics from management_project_summary.csv"""
     df = _load_csv("management_project_summary.csv")
     if df is None:
         return None
 
-    row = df[df["project_id"] == project_id]
+    if "project_id" not in df.columns:
+        return None
+
+    project_id = str(project_id).strip()
+    row = df[df["project_id"].astype(str).str.strip() == project_id]
     if len(row) == 0:
         return None
 
     row = row.iloc[0]
     return {
-        "project_id": row["project_id"],
-        "project_name": row["project_name"],
-        "gc_name": row["gc_name"],
-        "risk_level": row["risk_level"],
-        "main_issue": row["main_issue"],
-        "realized_margin_pct": row["realized_margin_pct"],
-        "cost_vs_budget": row["cost_vs_budget"],
-        "billing_gap_pct": row["billing_gap_pct"],
-        "approved_co_pct": row["approved_co_pct"],
-        "rejected_co_pct": row["rejected_co_pct"],
-        "total_rfis": int(row["total_rfis"]),
-        "labor_burn_ratio": row["labor_burn_ratio"],
-        "labor_avg_pct_overrun": row["labor_avg_pct_overrun"],
-        "material_avg_pct_overrun": row["material_avg_pct_overrun"],
-        "management_cause": row["management_cause"],
-        "evidence": row["evidence"],
-        "recommended_action": row["recommended_action"],
-        "severity": row["severity"],
+        "project_id": _row_value(row, "project_id"),
+        "project_name": _row_value(row, "project_name"),
+        "gc_name": _row_value(row, "gc_name"),
+        "risk_level": _row_value(row, "risk_level"),
+        "risk_score": _row_value(row, "risk_score"),
+        "main_issue": _row_value(row, "main_issue"),
+        "alert_class": _row_value(row, "alert_class"),
+        "trigger_score": _row_value(row, "trigger_score"),
+        "primary_trigger": _row_value(row, "primary_trigger"),
+        "supporting_triggers": _row_value(row, "supporting_triggers"),
+        "fired_triggers": _row_value(row, "fired_triggers"),
+        "why_now": _row_value(row, "why_now"),
+        "realized_margin_pct": _row_value(row, "realized_margin_pct"),
+        "cost_vs_budget": _row_value(row, "cost_vs_budget"),
+        "billing_gap_pct": _row_value(row, "billing_gap_pct"),
+        "approved_co_pct": _row_value(row, "approved_co_pct"),
+        "rejected_co_pct": _row_value(row, "rejected_co_pct"),
+        "pending_co_pct": _row_value(row, "pending_co_pct"),
+        "max_open_rfi_age": _row_value(row, "max_open_rfi_age"),
+        "total_rfis": int(_row_value(row, "total_rfis", 0) or 0),
+        "labor_burn_ratio": _row_value(row, "labor_burn_ratio"),
+        "labor_avg_pct_overrun": _row_value(row, "labor_avg_pct_overrun"),
+        "material_avg_pct_overrun": _row_value(row, "material_avg_pct_overrun"),
+        "overtime_spike": _row_value(row, "overtime_spike"),
+        "burn_rate_acceleration": _row_value(row, "burn_rate_acceleration"),
+        "crew_size_spike": _row_value(row, "crew_size_spike"),
+        "forecast_to_complete_trend": _row_value(row, "forecast_to_complete_trend"),
+        "management_cause": _row_value(row, "management_cause"),
+        "evidence": _row_value(row, "evidence"),
+        "recommended_action": _row_value(row, "recommended_action"),
+        "severity": _row_value(row, "severity"),
     }
 
 
@@ -166,6 +189,14 @@ def build_hybrid_project_packet(project_id: str) -> dict | None:
             "risk_level": summary["risk_level"],
             "severity": summary["severity"],
         },
+        "alert_provenance": {
+            "alert_class": summary.get("alert_class"),
+            "trigger_score": summary.get("trigger_score"),
+            "primary_trigger": summary.get("primary_trigger"),
+            "supporting_triggers": summary.get("supporting_triggers"),
+            "fired_triggers": summary.get("fired_triggers"),
+            "why_now": summary.get("why_now"),
+        },
         "pre_computed_metrics": {
             "main_issue": summary["main_issue"],
             "management_cause": summary["management_cause"],
@@ -174,13 +205,20 @@ def build_hybrid_project_packet(project_id: str) -> dict | None:
             "realized_margin_pct": summary["realized_margin_pct"],
             "cost_vs_budget": summary["cost_vs_budget"],
             "billing_gap_pct": summary["billing_gap_pct"],
+            "pending_co_pct": summary.get("pending_co_pct"),
+            "max_open_rfi_age": summary.get("max_open_rfi_age"),
             "labor_burn_ratio": summary["labor_burn_ratio"],
             "labor_avg_pct_overrun": summary["labor_avg_pct_overrun"],
             "material_avg_pct_overrun": summary["material_avg_pct_overrun"],
+            "overtime_spike": summary.get("overtime_spike"),
+            "burn_rate_acceleration": summary.get("burn_rate_acceleration"),
+            "crew_size_spike": summary.get("crew_size_spike"),
+            "forecast_to_complete_trend": summary.get("forecast_to_complete_trend"),
         },
         "change_orders": {
             "approved_co_pct": summary["approved_co_pct"],
             "rejected_co_pct": summary["rejected_co_pct"],
+            "pending_co_pct": summary.get("pending_co_pct"),
             "details": change_orders,
         },
         "rfis": {
@@ -222,7 +260,9 @@ You analyze project cost data, field notes, change orders, and billing history t
 
 Be direct, specific, and actionable. Use construction industry terminology.
 Always cite specific cost figures from the data provided.
-Format recovery actions as numbered items with dollar amounts."""
+Start with the best next action, then explain the dollars, timing, and evidence.
+Format recovery actions as numbered items with dollar amounts.
+Do not answer like a dashboard. Answer like an operator advising a CFO."""
 
 
 def determine_stage(project: dict) -> str:
@@ -448,5 +488,13 @@ def root_cause_prompt(project_context: str, question: str) -> str:
 
 USER QUESTION: {question}
 
-Provide a focused, actionable response. If analyzing root causes, identify the top 2-3 drivers.
-If recommending recovery actions, quantify each in dollars and explain the mechanism."""
+Provide a focused, actionable response.
+
+Format:
+1. Recommended action
+2. Expected dollars / time to cash
+3. Why this is the right move now
+4. Evidence
+
+If analyzing root causes, identify the top 2-3 drivers.
+If recommending recovery actions, quantify each in dollars, explain the mechanism, and say what is not worth doing if applicable."""
