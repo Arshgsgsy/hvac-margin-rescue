@@ -1,0 +1,19 @@
+{
+  "kpis": {
+    "total_projects": 405.0,
+    "total_contract": 6398815000.0,
+    "total_budget": 6468572800.0,
+    "total_cos_approved": 683298200.0,
+    "total_adjusted": 7082113200.0,
+    "total_actual_labor": 863862128.6000075,
+    "total_actual_material": 2766701351.3900003,
+    "total_rejected_cos": 221808800.0,
+    "avg_bid_margin": -0.007983099443932369,
+    "avg_realized_margin": 0.14337489361641859,
+    "avg_material_overrun_pct": 111.00312555812985,
+    "avg_labor_overrun_pct": -56.368024906226566,
+    "underwater_count": 12.0,
+    "negative_bid_margin_count": 236.0
+  },
+  "total_flagged": 101
+}

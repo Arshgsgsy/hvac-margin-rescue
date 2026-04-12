@@ -25,7 +25,7 @@ app/SQCNW7npB6s.zip
 app/vercel_ref/
 
 # output summaries (generated data)
-output_summaries/
+
 
 # LLM pipeline local reference material / caches
 pipeline/4_llm/dexter/
