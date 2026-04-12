@@ -7,8 +7,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'MarginIQ | Transform Your Financial Data',
-  description: 'AI-powered financial intelligence platform. Upload your data and unlock powerful insights into margin variances, risks, and recovery opportunities.',
+  title: 'MarginIQ | Upload Financial Data',
+  description: 'Upload your company financial data to analyze margins, detect risks, and discover recovery opportunities with AI-powered insights.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

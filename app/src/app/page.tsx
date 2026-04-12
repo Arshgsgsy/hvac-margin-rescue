@@ -1,5 +1,5 @@
-import { LandingPage } from '@/components/landing-page'
+import { UploadPage } from '@/components/upload-page'
 
 export default function Home() {
-  return <LandingPage />
+  return <UploadPage />
 }
