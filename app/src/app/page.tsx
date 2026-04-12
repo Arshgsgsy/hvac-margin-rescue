@@ -5,10 +5,12 @@ import { Tab1Executive } from '@/components/tabs/tab1-executive'
 import { Tab2SOV } from '@/components/tabs/tab2-sov'
 import { Tab3LaborMaterial } from '@/components/tabs/tab3-labor-material'
 import { Tab4Friction } from '@/components/tabs/tab4-friction'
+import { Tab5Pipeline } from '@/components/tabs/tab5-pipeline'
 import { PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
-import { BarChart3, Layers, Hammer, AlertOctagon, ChevronRight } from 'lucide-react'
+import { BarChart3, Layers, Hammer, AlertOctagon, ChevronRight, Terminal } from 'lucide-react'
 
 const TABS = [
+  { id: 'pipeline', label: 'Agent Pipeline', icon: Terminal, sub: 'How the data gets here' },
   { id: 'executive', label: 'Executive Portfolio View', icon: BarChart3, sub: 'Where is the bleed?' },
   { id: 'sov', label: 'SOV Variance Drill-Down', icon: Layers, sub: 'What part of the project failed?' },
   { id: 'labor', label: 'Labor & Material Root Causes', icon: Hammer, sub: 'Why did it cost more?' },
@@ -16,7 +18,7 @@ const TABS = [
 ]
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('executive')
+  const [activeTab, setActiveTab] = useState('pipeline')
   const erosion = PORTFOLIO_SUMMARY.avgBidMargin - PORTFOLIO_SUMMARY.avgRealizedMargin
 
   return (
@@ -131,6 +133,7 @@ export default function Home() {
             })()}
           </div>
 
+          {activeTab === 'pipeline' && <Tab5Pipeline />}
           {activeTab === 'executive' && <Tab1Executive />}
           {activeTab === 'sov' && <Tab2SOV />}
           {activeTab === 'labor' && <Tab3LaborMaterial />}
