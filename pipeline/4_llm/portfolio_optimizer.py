@@ -423,6 +423,12 @@ def optimize_portfolio(
     Returns:
         Portfolio optimization output
     """
+    if not analyses:
+        raise ValueError(
+            "Portfolio optimization requires at least one project analysis. "
+            "Run project recovery analysis successfully before optimizing the portfolio."
+        )
+
     print(f"Building portfolio input from {len(analyses)} analyses...")
     portfolio_input = build_portfolio_input(analyses, flagged_projects, resource_capacity)
 

@@ -306,6 +306,5 @@ def _get_degraded_features(missing_optional: list[str]) -> list[str]:
         "rfis_all.csv": "RFI analysis and tracking",
         "field_notes_all.csv": "Field note summaries",
         "sov_all.csv": "Schedule of Values breakdown",
-        "sov_budget_all.csv": "SOV budget vs actual comparison",
     }
     return [feature_map[f] for f in missing_optional if f in feature_map]

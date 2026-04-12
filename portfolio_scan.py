@@ -254,43 +254,38 @@ def main():
     contracts = contracts[["project_id", "project_name", "original_contract_value", "gc_name"]].copy()
     contracts = _coerce_numeric(contracts, ["original_contract_value"])
 
-    budget = _read_csv(
-        DATA_DIR / "sov_budget_all.csv",
-        note="[NOTE] Budget file not found, using labor actuals as a budget proxy: {path}",
+    budget_file = DATA_DIR / "sov_budget_all.csv"
+    if not budget_file.exists():
+        raise FileNotFoundError(
+            f"Required input not found: {budget_file}. "
+            "Portfolio scan requires SOV budget data and will not fall back to labor actuals."
+        )
+
+    budget = _read_csv(budget_file, required=True)
+    budget = _coerce_numeric(
+        budget,
+        [
+            "estimated_labor_cost",
+            "estimated_material_cost",
+            "estimated_equipment_cost",
+            "estimated_sub_cost",
+        ],
     )
-    if budget.empty:
-        budget_proj = labor_proj[["project_id", "actual_labor_cost"]].copy()
-        budget_proj["est_labor"] = budget_proj["actual_labor_cost"]
-        budget_proj["est_material"] = 0.0
-        budget_proj["est_equip"] = 0.0
-        budget_proj["est_sub"] = 0.0
-        budget_proj["total_budget"] = budget_proj["actual_labor_cost"]
-        budget_proj = budget_proj.drop(columns=["actual_labor_cost"])
-    else:
-        budget = _coerce_numeric(
-            budget,
-            [
-                "estimated_labor_cost",
-                "estimated_material_cost",
-                "estimated_equipment_cost",
-                "estimated_sub_cost",
-            ],
+    budget_proj = (
+        budget.groupby("project_id", as_index=False)
+        .agg(
+            est_labor=("estimated_labor_cost", "sum"),
+            est_material=("estimated_material_cost", "sum"),
+            est_equip=("estimated_equipment_cost", "sum"),
+            est_sub=("estimated_sub_cost", "sum"),
         )
-        budget_proj = (
-            budget.groupby("project_id", as_index=False)
-            .agg(
-                est_labor=("estimated_labor_cost", "sum"),
-                est_material=("estimated_material_cost", "sum"),
-                est_equip=("estimated_equipment_cost", "sum"),
-                est_sub=("estimated_sub_cost", "sum"),
-            )
-        )
-        budget_proj["total_budget"] = (
-            budget_proj["est_labor"].fillna(0)
-            + budget_proj["est_material"].fillna(0)
-            + budget_proj["est_equip"].fillna(0)
-            + budget_proj["est_sub"].fillna(0)
-        )
+    )
+    budget_proj["total_budget"] = (
+        budget_proj["est_labor"].fillna(0)
+        + budget_proj["est_material"].fillna(0)
+        + budget_proj["est_equip"].fillna(0)
+        + budget_proj["est_sub"].fillna(0)
+    )
 
     co_summary = _summarize_change_orders(
         _read_csv(

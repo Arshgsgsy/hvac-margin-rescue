@@ -2,8 +2,12 @@ import os
 import shutil
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
+
+load_dotenv(PROJECT_ROOT / ".env")
 FIXTURE_DATA_DIR = PROJECT_ROOT / "data"
 RUNTIME_DIR = PROJECT_ROOT / ".runtime"
 DATASET_ROOT = RUNTIME_DIR / "datasets"
@@ -22,6 +26,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 REQUIRED_CSV_FILES = [
     "contracts_all.csv",
     "labor_logs_all.csv",
+    "sov_budget_all.csv",
 ]
 
 # Optional files - pipeline will run with graceful degradation if missing
@@ -33,7 +38,6 @@ OPTIONAL_CSV_FILES = [
     "rfis_all.csv",
     "field_notes_all.csv",
     "sov_all.csv",
-    "sov_budget_all.csv",
 ]
 
 # All expected files (for upload validation)

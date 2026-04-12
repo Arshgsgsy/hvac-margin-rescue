@@ -571,8 +571,21 @@ def run_batch_analysis(dry_run: bool = False, use_hybrid: bool = True) -> list[d
         print(f"\n[DRY RUN] Would process {len(projects)} projects")
         return []
 
-    # Save all analyses
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Save errors separately so the pipeline runner has something actionable to inspect.
+    if errors:
+        errors_output = OUTPUT_DIR / "analysis_errors.json"
+        with open(errors_output, "w") as f:
+            json.dump(errors, f, indent=2)
+        print(f"Saved {len(errors)} errors to {errors_output}")
+
+    if not analyses:
+        raise RuntimeError(
+            f"Batch analysis produced 0 successful analyses out of {len(projects)} flagged projects."
+        )
+
+    # Save all analyses
     with open(ANALYSIS_OUTPUT, "w") as f:
         json.dump(analyses, f, indent=2)
     print(f"\nSaved {len(analyses)} analyses to {ANALYSIS_OUTPUT}")
@@ -684,6 +697,11 @@ async def run_batch_analysis_parallel(
         with open(errors_output, "w") as f:
             json.dump(result.errors, f, indent=2)
         print(f"Saved {len(result.errors)} errors to {errors_output}")
+
+    if not result.analyses:
+        raise RuntimeError(
+            f"Parallel batch analysis produced 0 successful analyses out of {len(projects)} flagged projects."
+        )
 
     # Generate portfolio summary
     if result.analyses:
