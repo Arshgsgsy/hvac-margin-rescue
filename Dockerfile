@@ -9,7 +9,7 @@ COPY app/package.json app/package-lock.json ./
 RUN npm ci
 
 COPY app/ ./
-RUN npm run build
+RUN mkdir -p public && npm run build
 
 
 FROM node:20-bookworm-slim AS runtime
