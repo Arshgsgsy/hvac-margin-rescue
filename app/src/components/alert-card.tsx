@@ -37,7 +37,7 @@ const severityConfig = {
 export function AlertCard({ project, rank }: AlertCardProps) {
   const cfg = severityConfig[project.severity]
   const Icon = cfg.icon
-  const erosion = Math.abs(project.marginDelta) * 100
+  const erosion = Math.abs(project.margin_delta) * 100
   const score = getPriorityScore(project)
 
   return (
@@ -69,16 +69,16 @@ export function AlertCard({ project, rank }: AlertCardProps) {
         <div className="grid grid-cols-3 gap-3">
           <div>
             <p className="text-muted-foreground text-xs mb-0.5">Contract</p>
-            <p className="text-foreground text-sm font-medium">{formatCurrency(project.contractValue)}</p>
+            <p className="text-foreground text-sm font-medium">{formatCurrency(project.contract_value)}</p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs mb-0.5">Bid Margin</p>
-            <p className="text-foreground text-sm font-medium">{formatPercent(project.bidMargin)}</p>
+            <p className="text-foreground text-sm font-medium">{formatPercent(project.bid_margin)}</p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs mb-0.5">Realized</p>
-            <p className={`text-sm font-medium ${project.marginDelta < -0.05 ? 'text-red-400' : project.marginDelta < -0.02 ? 'text-yellow-400' : 'text-green-400'}`}>
-              {formatPercent(project.realizedMargin)}
+            <p className={`text-sm font-medium ${project.margin_delta < -0.05 ? 'text-red-400' : project.margin_delta < -0.02 ? 'text-yellow-400' : 'text-green-400'}`}>
+              {formatPercent(project.realized_margin)}
             </p>
           </div>
         </div>
@@ -98,10 +98,10 @@ export function AlertCard({ project, rank }: AlertCardProps) {
         </div>
 
         {/* Primary action */}
-        {project.recoveryActions && project.recoveryActions[0] && (
+        {project.recovery_actions && project.recovery_actions[0] && (
           <div className="rounded-xl bg-muted/50 px-4 py-3">
             <p className="text-muted-foreground text-xs mb-0.5">Top action</p>
-            <p className="text-foreground text-xs">{project.recoveryActions[0].description}</p>
+            <p className="text-foreground text-xs">{project.recovery_actions[0].description}</p>
           </div>
         )}
 

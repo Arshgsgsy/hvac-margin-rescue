@@ -9,8 +9,8 @@ interface Props {
 
 export default function CostBreakdown({ project }: Props) {
   const data = [
-    { name: 'Labor', Budget: project.laborCost.budget, Actual: project.laborCost.actual },
-    { name: 'Material', Budget: project.materialCost.budget, Actual: project.materialCost.actual },
+    { name: 'Labor', Budget: project.labor_cost.budget, Actual: project.labor_cost.actual },
+    { name: 'Material', Budget: project.material_cost.budget, Actual: project.material_cost.actual },
   ]
 
   const fmt = (v: number) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`

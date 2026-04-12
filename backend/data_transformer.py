@@ -1,0 +1,234 @@
+import json
+import pandas as pd
+from pathlib import Path
+from config import DATA_DIR, OUTPUT_DIR
+from datetime import datetime
+
+
+def _read_json(path: Path):
+    if not path.exists():
+        return None
+    return json.loads(path.read_text())
+
+
+def _read_csv(path: Path) -> pd.DataFrame | None:
+    if not path.exists():
+        return None
+    return pd.read_csv(path)
+
+
+def load_portfolio_summary() -> dict | None:
+    raw = _read_json(OUTPUT_DIR / "portfolio_summary.json")
+    if not raw:
+        return None
+    kpis = raw.get("kpis", {})
+    flagged = _read_json(OUTPUT_DIR / "flagged_projects.json") or []
+    critical_count = sum(1 for p in flagged if p.get("severity", "").lower() == "critical")
+    total_exposure = sum(
+        abs(p.get("realized_margin_dollars", 0))
+        for p in flagged
+        if p.get("severity", "").lower() == "critical"
+    )
+    return {
+        "total_projects": int(kpis.get("total_projects", 0)),
+        "total_value": kpis.get("total_contract", 0),
+        "avg_bid_margin": kpis.get("avg_bid_margin", 0),
+        "avg_realized_margin": kpis.get("avg_realized_margin", 0),
+        "flagged_count": raw.get("total_flagged", 0),
+        "critical_count": critical_count,
+        "total_exposure": total_exposure,
+    }
+
+
+def load_all_projects() -> list[dict]:
+    flagged = _read_json(OUTPUT_DIR / "flagged_projects.json")
+    if not flagged:
+        return []
+    return [_transform_project(p) for p in flagged]
+
+
+def load_single_project(project_id: str) -> dict | None:
+    flagged = _read_json(OUTPUT_DIR / "flagged_projects.json")
+    if not flagged:
+        return None
+    match = next((p for p in flagged if p["project_id"] == project_id), None)
+    if not match:
+        return None
+    project = _transform_project(match)
+    _enrich_project(project, project_id)
+    return project
+
+
+def _transform_project(raw: dict) -> dict:
+    bid = raw.get("bid_margin", 0)
+    realized = raw.get("realized_margin_pct", 0)
+    est_labor = raw.get("est_labor", 0)
+    actual_labor = raw.get("actual_labor_cost", 0)
+    est_material = raw.get("est_material", 0)
+    actual_material = raw.get("actual_material_cost", 0)
+    contract = raw.get("original_contract_value", 0)
+    pct_billed = raw.get("pct_billed", 0)
+
+    # Estimate percent complete from cost progress
+    total_budget = raw.get("total_budget", 1)
+    actual_tracked = raw.get("actual_tracked_cost", 0)
+    pct_complete = min(actual_tracked / total_budget, 1.0) if total_budget > 0 else 0
+
+    return {
+        "id": raw["project_id"],
+        "name": raw.get("project_name", ""),
+        "sector": _infer_sector(raw.get("project_name", "")),
+        "contract_value": contract,
+        "bid_margin": bid,
+        "realized_margin": realized,
+        "margin_delta": realized - bid,
+        "severity": raw.get("severity", "watch").lower(),
+        "labor_overrun": actual_labor - est_labor,
+        "material_overrun": actual_material - est_material,
+        "billing_gap": pct_complete - pct_billed,
+        "labor_cost": {"budget": est_labor, "actual": actual_labor},
+        "material_cost": {"budget": est_material, "actual": actual_material},
+        "billing_status": {
+            "percent_complete": pct_complete,
+            "percent_billed": pct_billed,
+        },
+        # These get populated by LLM or enrichment
+        "root_cause": None,
+        "recovery_actions": None,
+        "field_note_summary": None,
+    }
+
+
+def _infer_sector(name: str) -> str:
+    name_lower = name.lower()
+    if any(w in name_lower for w in ["hospital", "medical", "health", "clinic"]):
+        return "Healthcare"
+    if any(w in name_lower for w in ["school", "university", "education", "k-12", "middle"]):
+        return "K-12 Education"
+    if any(w in name_lower for w in ["data center", "datacenter"]):
+        return "Data Center"
+    if any(w in name_lower for w in ["office", "commercial", "tower"]):
+        return "Commercial Office"
+    if any(w in name_lower for w in ["housing", "residential", "apartment", "multifamily", "condo"]):
+        return "Multifamily Residential"
+    return "HVAC"
+
+
+def _enrich_project(project: dict, project_id: str):
+    """Add time-series and detail data from raw CSVs."""
+    # Labor by week
+    labor_weekly = _read_csv(OUTPUT_DIR / "labor_project_week_summary.csv")
+    if labor_weekly is not None:
+        pw = labor_weekly[labor_weekly["project_id"] == project_id]
+        project["labor_by_week"] = [
+            {
+                "week": row["week_start"],
+                "regular": round(row["total_hours_st"] * row["avg_hourly_rate"] * row["avg_burden_multiplier"], 0),
+                "overtime": round(row["total_hours_ot"] * row["avg_hourly_rate"] * row["avg_burden_multiplier"] * 1.5, 0),
+            }
+            for _, row in pw.iterrows()
+        ]
+
+    # Change orders
+    co_df = _read_csv(DATA_DIR / "change_orders_all.csv")
+    if co_df is not None:
+        co_proj = co_df[co_df["project_id"] == project_id]
+        project["change_orders"] = [
+            {
+                "id": row["co_number"],
+                "description": row["description"],
+                "amount": row["amount"],
+                "status": row["status"],
+                "reason_category": row["reason_category"],
+            }
+            for _, row in co_proj.iterrows()
+        ]
+
+    # RFIs
+    rfi_df = _read_csv(DATA_DIR / "rfis_all.csv")
+    if rfi_df is not None:
+        rfi_proj = rfi_df[rfi_df["project_id"] == project_id]
+        today = datetime.now()
+        project["rfis"] = [
+            {
+                "id": row["rfi_number"],
+                "status": row["status"].lower() if isinstance(row["status"], str) else "unknown",
+                "days_open": (today - pd.to_datetime(row["date_submitted"])).days
+                if pd.notna(row.get("date_responded")) is False or row["status"].lower() == "open"
+                else (pd.to_datetime(row["date_responded"]) - pd.to_datetime(row["date_submitted"])).days
+                if pd.notna(row.get("date_responded"))
+                else (today - pd.to_datetime(row["date_submitted"])).days,
+                "description": row["subject"],
+                "priority": row.get("priority", ""),
+                "cost_impact": row.get("cost_impact", False),
+            }
+            for _, row in rfi_proj.iterrows()
+        ]
+
+    # SOV lines (budget)
+    sov_df = _read_csv(DATA_DIR / "sov_budget_all.csv")
+    labor_sov = _read_csv(OUTPUT_DIR / "labor_project_sov_summary.csv")
+    material_sov = _read_csv(OUTPUT_DIR / "material_project_sov_summary.csv")
+    if sov_df is not None:
+        sov_proj = sov_df[sov_df["project_id"] == project_id]
+        sov_lines = []
+        for _, row in sov_proj.iterrows():
+            line_id = row["sov_line_id"]
+            budgeted = row.get("estimated_labor_cost", 0) + row.get("estimated_material_cost", 0)
+            actual = 0
+            if labor_sov is not None:
+                lm = labor_sov[(labor_sov["project_id"] == project_id) & (labor_sov["sov_line_id"] == line_id)]
+                if len(lm) > 0:
+                    actual += lm.iloc[0].get("total_labor_cost", 0)
+            if material_sov is not None:
+                mm = material_sov[(material_sov["project_id"] == project_id) & (material_sov["sov_line_id"] == line_id)]
+                if len(mm) > 0:
+                    actual += mm.iloc[0].get("total_material_cost", 0)
+            sov_lines.append({
+                "name": line_id,
+                "budgeted": budgeted,
+                "actual": actual,
+            })
+        project["sov_lines"] = sov_lines
+
+    # Material deliveries
+    mat_df = _read_csv(DATA_DIR / "material_deliveries_all.csv")
+    if mat_df is not None:
+        mat_proj = mat_df[mat_df["project_id"] == project_id]
+        project["material_deliveries"] = [
+            {
+                "description": row["item_description"],
+                "total_cost": row["total_cost"],
+                "date": row["date"],
+                "condition": row.get("condition_notes", ""),
+                "vendor": row.get("vendor", ""),
+            }
+            for _, row in mat_proj.iterrows()
+        ]
+
+    # Billing history
+    bill_df = _read_csv(DATA_DIR / "billing_history_all.csv")
+    if bill_df is not None:
+        bill_proj = bill_df[bill_df["project_id"] == project_id]
+        project["billing_history"] = [
+            {
+                "period_end": row["period_end"],
+                "period_total": row["period_total"],
+                "cumulative_billed": row["cumulative_billed"],
+                "retention_held": row.get("retention_held", 0),
+                "status": row.get("status", ""),
+            }
+            for _, row in bill_proj.iterrows()
+        ]
+
+    # RFI by week (aggregate)
+    if rfi_df is not None:
+        rfi_proj = rfi_df[rfi_df["project_id"] == project_id].copy()
+        if len(rfi_proj) > 0:
+            rfi_proj["date_submitted"] = pd.to_datetime(rfi_proj["date_submitted"])
+            rfi_proj["week"] = rfi_proj["date_submitted"].dt.to_period("W").astype(str)
+            weekly = rfi_proj.groupby("week").agg(rfi_count=("rfi_number", "count")).reset_index()
+            project["rfi_by_week"] = [
+                {"week": row["week"], "rfi_count": int(row["rfi_count"])}
+                for _, row in weekly.iterrows()
+            ]

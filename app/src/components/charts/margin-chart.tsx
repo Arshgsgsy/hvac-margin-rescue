@@ -29,12 +29,12 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export default function MarginChart({ projects }: Props) {
   const data = [...projects]
-    .sort((a, b) => a.realizedMargin - b.realizedMargin)
+    .sort((a, b) => a.realized_margin - b.realized_margin)
     .map((p) => ({
       id: p.id.replace('PRJ-', ''),
       name: p.name,
-      bid: +(p.bidMargin * 100).toFixed(1),
-      realized: +(p.realizedMargin * 100).toFixed(1),
+      bid: +(p.bid_margin * 100).toFixed(1),
+      realized: +(p.realized_margin * 100).toFixed(1),
       severity: p.severity,
     }))
 

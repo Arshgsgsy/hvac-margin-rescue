@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Tab1Executive } from '@/components/tabs/tab1-executive'
 import { Tab2SOV } from '@/components/tabs/tab2-sov'
 import { Tab3LaborMaterial } from '@/components/tabs/tab3-labor-material'
 import { Tab4Friction } from '@/components/tabs/tab4-friction'
 import { Tab5Pipeline } from '@/components/tabs/tab5-pipeline'
-import { PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
-import { BarChart3, Layers, Hammer, AlertOctagon, ChevronRight, Terminal } from 'lucide-react'
+import { formatCurrency, formatPercent } from '@/lib/data'
+import { fetchPortfolioSummary, fetchProjects } from '@/lib/api'
+import { Project, PortfolioSummary } from '@/lib/types'
+import { BarChart3, Layers, Hammer, AlertOctagon, ChevronRight, Terminal, Loader2 } from 'lucide-react'
 
 const TABS = [
   { id: 'pipeline', label: 'Agent Pipeline', icon: Terminal, sub: 'How the data gets here' },
@@ -19,7 +21,28 @@ const TABS = [
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('pipeline')
-  const erosion = PORTFOLIO_SUMMARY.avgBidMargin - PORTFOLIO_SUMMARY.avgRealizedMargin
+  const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [summary, projs] = await Promise.all([
+        fetchPortfolioSummary(),
+        fetchProjects(),
+      ])
+      setPortfolio(summary)
+      setProjects(projs)
+    } catch {
+      // Data not available yet (pipeline hasn't run)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  const erosion = portfolio ? portfolio.avg_bid_margin - portfolio.avg_realized_margin : 0
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -36,18 +59,22 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs">
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-muted-foreground">Portfolio:</span>
-              <span className="text-foreground font-medium">{formatCurrency(PORTFOLIO_SUMMARY.totalValue)}</span>
-            </div>
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-muted-foreground">Margin gap:</span>
-              <span className="text-red-400 font-semibold">{formatPercent(erosion)}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-red-400 font-medium">{PORTFOLIO_SUMMARY.criticalCount} Critical</span>
-            </div>
+            {portfolio && (
+              <>
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="text-muted-foreground">Portfolio:</span>
+                  <span className="text-foreground font-medium">{formatCurrency(portfolio.total_value)}</span>
+                </div>
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="text-muted-foreground">Margin gap:</span>
+                  <span className="text-red-400 font-semibold">{formatPercent(erosion)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-red-400 font-medium">{portfolio.critical_count} Critical</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -82,13 +109,15 @@ export default function Home() {
           </nav>
 
           {/* Summary box */}
-          <div className="mx-3 mt-8 rounded-xl border border-red-500/30 bg-red-500/5 p-4">
-            <p className="text-red-400 text-xs font-semibold uppercase tracking-wide mb-3">Recovery Opportunity</p>
-            <p className="text-foreground text-xl font-bold">{formatCurrency(
-              PORTFOLIO_SUMMARY.flaggedCount * 280000
-            )}</p>
-            <p className="text-muted-foreground text-xs mt-1">Estimated recoverable across {PORTFOLIO_SUMMARY.flaggedCount} flagged projects</p>
-          </div>
+          {portfolio && (
+            <div className="mx-3 mt-8 rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+              <p className="text-red-400 text-xs font-semibold uppercase tracking-wide mb-3">Recovery Opportunity</p>
+              <p className="text-foreground text-xl font-bold">{formatCurrency(
+                portfolio.flagged_count * 280000
+              )}</p>
+              <p className="text-muted-foreground text-xs mt-1">Estimated recoverable across {portfolio.flagged_count} flagged projects</p>
+            </div>
+          )}
         </aside>
 
         {/* Mobile tab bar */}
@@ -133,12 +162,32 @@ export default function Home() {
             })()}
           </div>
 
-          {activeTab === 'pipeline' && <Tab5Pipeline />}
-          {activeTab === 'executive' && <Tab1Executive />}
-          {activeTab === 'sov' && <Tab2SOV />}
-          {activeTab === 'labor' && <Tab3LaborMaterial />}
-          {activeTab === 'friction' && <Tab4Friction />}
+          {activeTab === 'pipeline' && <Tab5Pipeline portfolio={portfolio} onPipelineComplete={loadData} />}
+          {activeTab === 'executive' && (
+            loading ? <LoadingState /> : <Tab1Executive projects={projects} portfolio={portfolio} />
+          )}
+          {activeTab === 'sov' && (
+            loading ? <LoadingState /> : <Tab2SOV projects={projects} />
+          )}
+          {activeTab === 'labor' && (
+            loading ? <LoadingState /> : <Tab3LaborMaterial projects={projects} />
+          )}
+          {activeTab === 'friction' && (
+            loading ? <LoadingState /> : <Tab4Friction projects={projects} />
+          )}
         </main>
+      </div>
+    </div>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="text-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
+        <p className="text-muted-foreground text-sm">Loading data...</p>
+        <p className="text-muted-foreground text-xs mt-1">Run the pipeline first if no data is available.</p>
       </div>
     </div>
   )
