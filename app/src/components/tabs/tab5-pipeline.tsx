@@ -263,7 +263,7 @@ export function Tab5Pipeline() {
       <div className="space-y-2">
         {STEPS.map((step, i) => {
           const status = statuses[i]
-          const isExpanded = expandedStep === i || (done && visibleLogs[i].length > 0 && expandedStep === null)
+          const isExpanded = expandedStep === i
           const hasLogs = visibleLogs[i].length > 0
 
           return (
