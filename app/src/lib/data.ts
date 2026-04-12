@@ -540,14 +540,15 @@ export const MOCK_PROJECTS: Project[] = [
   },
 ]
 
+// Real data from pipeline/output/portfolio_summary.json
 export const PORTFOLIO_SUMMARY: PortfolioSummary = {
-  totalProjects: 47,
-  totalValue: 62840000,
-  avgBidMargin: 0.138,
-  avgRealizedMargin: 0.094,
-  flaggedCount: 8,
-  criticalCount: 4,
-  totalExposure: 4820000 + 7340000 + 3180000 + 2240000,
+  totalProjects: 405,
+  totalValue: 6398815000, // $6.4B total contract value
+  avgBidMargin: -0.008, // -0.8% avg bid margin
+  avgRealizedMargin: 0.143, // 14.3% avg realized margin
+  flaggedCount: 101, // 101 flagged projects
+  criticalCount: 12, // 12 underwater (critical) projects
+  totalExposure: 221808800, // Total rejected COs as exposure proxy
 }
 
 export function getProject(id: string): Project | undefined {
