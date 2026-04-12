@@ -21,7 +21,7 @@ export const RISK_SCORE_MEDIUM_THRESHOLD = 40
 export const RETENTION_RATE = 0.10
 
 // LLM Configuration
-export const LLM_MODEL_CHAT = 'claude-haiku-4-5-20251001'
-export const LLM_MODEL_ANALYSIS = 'claude-sonnet-4-20250514'
+export const LLM_MODEL_CHAT = 'claude-opus-4-5-20251101'
+export const LLM_MODEL_ANALYSIS = 'claude-opus-4-5-20251101'
 export const LLM_MAX_TOKENS_CHAT = 1024
 export const LLM_MAX_TOKENS_ANALYSIS = 2000
