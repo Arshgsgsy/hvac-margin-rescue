@@ -56,7 +56,57 @@ def load_single_project(project_id: str) -> dict | None:
         return None
     project = _transform_project(match)
     _enrich_project(project, project_id)
+    _enrich_with_analysis(project, project_id)
     return project
+
+
+def _enrich_with_analysis(project: dict, project_id: str):
+    """Add pre-computed LLM analysis if available"""
+    analysis_file = OUTPUT_DIR / "project_analyses.json"
+    if not analysis_file.exists():
+        return
+
+    analyses = _read_json(analysis_file)
+    if not analyses:
+        return
+
+    for analysis in analyses:
+        if analysis.get("project_id") == project_id:
+            # Add root causes from analysis
+            if "root_causes" in analysis:
+                project["root_causes"] = analysis["root_causes"]
+
+            # Add recovery actions from analysis
+            if "recovery_actions" in analysis:
+                project["recovery_actions"] = analysis["recovery_actions"]
+
+            # Add forecasts
+            if "forecast_if_no_action" in analysis:
+                project["forecast_if_no_action"] = analysis["forecast_if_no_action"]
+            if "forecast_with_action" in analysis:
+                project["forecast_with_action"] = analysis["forecast_with_action"]
+
+            # Add total recoverable estimate
+            if "total_recoverable_estimate" in analysis:
+                project["total_recoverable_estimate"] = analysis["total_recoverable_estimate"]
+
+            # Add financial snapshot from analysis
+            if "financial_snapshot" in analysis:
+                project["llm_financial_snapshot"] = analysis["financial_snapshot"]
+
+            # Add recoverability assessment if present (from diagnosis)
+            if "recoverability_assessment" in analysis:
+                project["recoverability_assessment"] = analysis["recoverability_assessment"]
+
+            # Add headline
+            if "headline" in analysis:
+                project["headline"] = analysis["headline"]
+
+            # Add analysis confidence
+            if "confidence" in analysis:
+                project["analysis_confidence"] = analysis["confidence"]
+
+            break
 
 
 def _transform_project(raw: dict) -> dict:
