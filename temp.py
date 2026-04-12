@@ -4,7 +4,7 @@ con = duckdb.connect()
 
 df = con.execute("""
 SELECT *
-FROM read_csv_auto('hvac_data/material_deliveries_all.csv', header=True)
+FROM read_csv_auto('hvac_data/change_orders_all.csv')
 LIMIT 5
 """).df()
 
