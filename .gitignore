@@ -7,3 +7,22 @@ __pycache__/
 *.pyc
 .DS_Store
 hvac_data/
+
+# CSV data files
+*.csv
+hvac_data.zip
+
+# Claude Code session data
+.claude/
+
+# Build scripts (dev only)
+app/build_*.ps1
+app/redesign*.ps1
+app/fix_page.ps1
+
+# Reference/temp files
+app/SQCNW7npB6s.zip
+app/vercel_ref/
+
+# output summaries (generated data)
+output_summaries/
