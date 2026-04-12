@@ -670,30 +670,30 @@ export function UploadPage() {
                 <p className="text-muted-foreground">Portfolio health overview for CFO review</p>
               </div>
 
-              {/* Big metrics cards */}
+              {/* Big metrics cards - Row 1: Portfolio Value, Erosion, Exposure, Recoverable */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="rounded-2xl border border-border bg-card p-6 text-center">
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <Building2 className="w-6 h-6 text-primary" />
+                    <DollarSign className="w-6 h-6 text-primary" />
                   </div>
-                  <div className="text-4xl font-bold text-foreground">{PORTFOLIO_SUMMARY.totalProjects}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Projects Analyzed</div>
+                  <div className="text-4xl font-bold text-foreground">{formatCurrency(PORTFOLIO_SUMMARY.totalValue)}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Portfolio Value</div>
                 </div>
 
                 <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
                   <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto mb-3">
-                    <AlertTriangle className="w-6 h-6 text-destructive" />
+                    <TrendingDown className="w-6 h-6 text-destructive" />
                   </div>
-                  <div className="text-4xl font-bold text-destructive">{MOCK_PROJECTS.length}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Flagged Projects</div>
+                  <div className="text-4xl font-bold text-destructive">-{formatPercent(avgMarginErosion)}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Avg Margin Erosion</div>
                 </div>
 
                 <div className="rounded-2xl border border-orange-500/30 bg-orange-500/5 p-6 text-center">
                   <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mx-auto mb-3">
-                    <TrendingDown className="w-6 h-6 text-orange-500" />
+                    <AlertTriangle className="w-6 h-6 text-orange-500" />
                   </div>
                   <div className="text-4xl font-bold text-orange-500">{formatCurrency(totalOverrun)}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Total Overrun Exposure</div>
+                  <div className="text-sm text-muted-foreground mt-1">Total Exposure</div>
                 </div>
 
                 <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
@@ -705,22 +705,45 @@ export function UploadPage() {
                 </div>
               </div>
 
-              {/* Key findings */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <h3 className="font-semibold text-foreground mb-2">Portfolio Value</h3>
-                  <div className="text-2xl font-bold text-foreground">{formatCurrency(PORTFOLIO_SUMMARY.totalValue)}</div>
-                  <p className="text-sm text-muted-foreground mt-1">Total contract value under management</p>
+              {/* Row 2: Projects Analyzed (with severity breakdown) and Flagged Projects */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-border bg-card p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-7 h-7 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-4xl font-bold text-foreground">{PORTFOLIO_SUMMARY.totalProjects}</div>
+                      <div className="text-sm text-muted-foreground">Projects Analyzed</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-center px-3 py-2 rounded-lg bg-[#ef4444]/10">
+                        <div className="text-lg font-bold" style={{ color: '#ef4444' }}>{criticalProjects.length}</div>
+                        <div className="text-xs text-muted-foreground">Critical</div>
+                      </div>
+                      <div className="text-center px-3 py-2 rounded-lg bg-[#f97316]/10">
+                        <div className="text-lg font-bold" style={{ color: '#f97316' }}>{warningProjects.length}</div>
+                        <div className="text-xs text-muted-foreground">Elevated</div>
+                      </div>
+                      <div className="text-center px-3 py-2 rounded-lg bg-[#eab308]/10">
+                        <div className="text-lg font-bold" style={{ color: '#eab308' }}>{watchProjects.length}</div>
+                        <div className="text-xs text-muted-foreground">Monitor</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <h3 className="font-semibold text-foreground mb-2">Avg Margin Erosion</h3>
-                  <div className="text-2xl font-bold text-destructive">-{formatPercent(avgMarginErosion)}</div>
-                  <p className="text-sm text-muted-foreground mt-1">Average margin loss across flagged projects</p>
-                </div>
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <h3 className="font-semibold text-foreground mb-2">Critical Issues</h3>
-                  <div className="text-2xl font-bold text-destructive">{criticalProjects.length}</div>
-                  <p className="text-sm text-muted-foreground mt-1">Projects requiring immediate action</p>
+
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                      <AlertCircle className="w-7 h-7 text-destructive" />
+                    </div>
+                    <div>
+                      <div className="text-4xl font-bold text-destructive">{MOCK_PROJECTS.length}</div>
+                      <div className="text-sm text-muted-foreground">Flagged Projects</div>
+                      <div className="text-xs text-muted-foreground mt-1">Requiring review and action</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -918,68 +941,6 @@ export function UploadPage() {
                         />
                       </LineChart>
                     </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* Charts Section - No Time Filter */}
-              <div className="space-y-6">
-                <h3 className="text-xl font-bold text-foreground">Project Analysis</h3>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Severity Distribution Pie Chart */}
-                  <div className="rounded-xl border border-border bg-card p-5">
-                    <h4 className="font-semibold text-foreground mb-2">Projects by Severity Level</h4>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Distribution of flagged projects across severity levels. Critical projects need immediate attention.
-                    </p>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={severityChartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={90}
-                            paddingAngle={3}
-                            dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
-                          >
-                            {severityChartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Overrun by Category Bar Chart */}
-                  <div className="rounded-xl border border-border bg-card p-5">
-                    <h4 className="font-semibold text-foreground mb-2">Cost Overrun by Category</h4>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Labor costs are typically the largest contributor to project overruns. This breakdown helps identify focus areas.
-                    </p>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={overrunByCategory}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="category" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                          <YAxis 
-                            tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                          />
-                          <Tooltip 
-                            formatter={(value: number) => [formatCurrency(value), 'Amount']}
-                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                          />
-                          <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
                   </div>
                 </div>
               </div>
