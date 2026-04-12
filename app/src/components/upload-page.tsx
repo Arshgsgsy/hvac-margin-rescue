@@ -707,45 +707,46 @@ export function UploadPage() {
                 </div>
               </div>
 
-              {/* Row 2: Projects Analyzed (with severity breakdown) and Flagged Projects */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-border bg-card p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Building2 className="w-7 h-7 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-4xl font-bold text-foreground">{PORTFOLIO_SUMMARY.totalProjects}</div>
-                      <div className="text-sm text-muted-foreground">Projects Analyzed</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-center px-3 py-2 rounded-lg bg-[#ef4444]/10">
-                        <div className="text-lg font-bold" style={{ color: '#ef4444' }}>{criticalProjects.length}</div>
-                        <div className="text-xs text-muted-foreground">Critical</div>
-                      </div>
-                      <div className="text-center px-3 py-2 rounded-lg bg-[#f97316]/10">
-                        <div className="text-lg font-bold" style={{ color: '#f97316' }}>{warningProjects.length}</div>
-                        <div className="text-xs text-muted-foreground">Elevated</div>
-                      </div>
-                      <div className="text-center px-3 py-2 rounded-lg bg-[#eab308]/10">
-                        <div className="text-lg font-bold" style={{ color: '#eab308' }}>{watchProjects.length}</div>
-                        <div className="text-xs text-muted-foreground">Monitor</div>
-                      </div>
-                    </div>
+              {/* Row 2: Projects Analyzed -> Flagged -> Critical -> Elevated -> Monitor */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="rounded-xl border border-border bg-card p-4 text-center">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                    <Building2 className="w-5 h-5 text-primary" />
                   </div>
+                  <div className="text-3xl font-bold text-foreground">{PORTFOLIO_SUMMARY.totalProjects}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Projects Analyzed</div>
                 </div>
 
-                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                      <AlertCircle className="w-7 h-7 text-destructive" />
-                    </div>
-                    <div>
-                      <div className="text-4xl font-bold text-destructive">{MOCK_PROJECTS.length}</div>
-                      <div className="text-sm text-muted-foreground">Flagged Projects</div>
-                      <div className="text-xs text-muted-foreground mt-1">Requiring review and action</div>
-                    </div>
+                <div className="rounded-xl border border-muted-foreground/30 bg-muted/30 p-4 text-center">
+                  <div className="w-10 h-10 rounded-lg bg-muted-foreground/10 flex items-center justify-center mx-auto mb-2">
+                    <AlertCircle className="w-5 h-5 text-muted-foreground" />
                   </div>
+                  <div className="text-3xl font-bold text-foreground">{MOCK_PROJECTS.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Flagged</div>
+                </div>
+
+                <div className="rounded-xl border-2 border-[#ef4444]/50 bg-[#ef4444]/5 p-4 text-center">
+                  <div className="w-10 h-10 rounded-lg bg-[#ef4444]/15 flex items-center justify-center mx-auto mb-2">
+                    <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
+                  </div>
+                  <div className="text-3xl font-bold text-[#ef4444]">{criticalProjects.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Critical</div>
+                </div>
+
+                <div className="rounded-xl border-2 border-[#f97316]/50 bg-[#f97316]/5 p-4 text-center">
+                  <div className="w-10 h-10 rounded-lg bg-[#f97316]/15 flex items-center justify-center mx-auto mb-2">
+                    <AlertCircle className="w-5 h-5 text-[#f97316]" />
+                  </div>
+                  <div className="text-3xl font-bold text-[#f97316]">{warningProjects.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Elevated</div>
+                </div>
+
+                <div className="rounded-xl border-2 border-[#eab308]/50 bg-[#eab308]/5 p-4 text-center">
+                  <div className="w-10 h-10 rounded-lg bg-[#eab308]/15 flex items-center justify-center mx-auto mb-2">
+                    <Eye className="w-5 h-5 text-[#eab308]" />
+                  </div>
+                  <div className="text-3xl font-bold text-[#eab308]">{watchProjects.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Monitor</div>
                 </div>
               </div>
 
