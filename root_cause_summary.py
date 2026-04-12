@@ -305,6 +305,7 @@ def main():
         "billing_gap_pct",
         "approved_co_pct",
         "rejected_co_pct",
+        "pending_co_pct",
         "labor_burn_ratio",
         "material_burn_ratio",
         "labor_avg_pct_overrun",
@@ -323,6 +324,7 @@ def main():
         "material_burn_ratio",
         "labor_avg_pct_overrun",
         "material_avg_pct_overrun",
+        "forecast_to_complete_trend",
     ]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").round(3)
@@ -348,7 +350,7 @@ def main():
         labels=["Low", "Moderate", "High", "Critical"],
     )
 
-    preferred_cols = [
+    final_cols = [
         "project_id",
         "project_name",
         "gc_name",
@@ -381,19 +383,15 @@ def main():
         "recommended_action",
         "severity",
     ]
-    final_cols = [c for c in preferred_cols if c in df.columns]
+    final_cols = [column for column in final_cols if column in df.columns]
     final = df[final_cols].copy()
 
     severity_order = {"Critical": 3, "High": 2, "Moderate": 1, "Low": 0}
     final["_severity_rank"] = final["severity"].astype(str).map(severity_order).fillna(-1)
-    sort_cols = ["_severity_rank"]
-    ascending = [False]
-    if "trigger_score" in final.columns:
-        sort_cols.append("trigger_score")
-        ascending.append(False)
-    if "realized_margin_pct" in final.columns:
-        sort_cols.append("realized_margin_pct")
-        ascending.append(True)
+    sort_cols = [
+        column for column in ["_severity_rank", "trigger_score", "realized_margin_pct"] if column in final.columns
+    ]
+    ascending = [False, False, True][: len(sort_cols)]
     final = final.sort_values(by=sort_cols, ascending=ascending).drop(columns=["_severity_rank"])
 
     final.to_csv(OUTPUT_FILE, index=False)

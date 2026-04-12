@@ -47,8 +47,8 @@ STAGES = [
     },
     {
         "id": "3_flag",
-        "label": "Flag, Score & Summarize",
-        "description": "Identify at-risk projects, compute risk scores, and build management summaries",
+        "label": "Flag & Score",
+        "description": "Identify at-risk projects, compute risk scores, and prepare the management summary",
         "scripts": [
             PROJECT_ROOT / "portfolio_scan.py",
             PROJECT_ROOT / "project_flagging.py",
