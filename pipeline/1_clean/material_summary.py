@@ -1,14 +1,13 @@
 import duckdb
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
-INPUT_FILE = BASE_DIR / "hvac_data" / "material_deliveries_all.csv"
-OUTPUT_DIR = BASE_DIR / "output_summaries"
+ROOT = Path(__file__).resolve().parents[2]
+INPUT_FILE = ROOT / "hvac_data" / "material_deliveries_all.csv"
+OUTPUT_DIR = ROOT / "output_summaries"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 con = duckdb.connect()
 
-# Create cleaned materials table
 con.execute(f"""
 CREATE OR REPLACE TABLE materials AS
 SELECT
@@ -32,7 +31,6 @@ WHERE project_id IS NOT NULL
   AND TRY_CAST(total_cost AS DOUBLE) IS NOT NULL
 """)
 
-# 1) Project-level summary
 con.execute(f"""
 COPY (
     SELECT
@@ -53,7 +51,6 @@ COPY (
 ) TO '{OUTPUT_DIR / "material_project_summary.csv"}' (HEADER, DELIMITER ',')
 """)
 
-# 2) Project + SOV summary
 con.execute(f"""
 COPY (
     SELECT
@@ -74,7 +71,6 @@ COPY (
 ) TO '{OUTPUT_DIR / "material_project_sov_summary.csv"}' (HEADER, DELIMITER ',')
 """)
 
-# 3) Project + week summary
 con.execute(f"""
 COPY (
     SELECT
