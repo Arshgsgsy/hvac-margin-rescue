@@ -20,12 +20,12 @@ const TABS = [
 
 export default function Home() {
   const [showDashboard, setShowDashboard] = useState(false)
-  const [activeTab, setActiveTab] = useState('pipeline')
+  const [activeTab, setActiveTab] = useState('executive')
   const erosion = PORTFOLIO_SUMMARY.avgBidMargin - PORTFOLIO_SUMMARY.avgRealizedMargin
 
-  // Show upload page first
+  // Show upload page first - pipeline runs automatically after file upload
   if (!showDashboard) {
-    return <UploadPage onProceed={() => setShowDashboard(true)} />
+    return <UploadPage onComplete={() => setShowDashboard(true)} />
   }
 
   // After upload, show the dashboard
