@@ -1,0 +1,16 @@
+.env
+.env.*
+.git
+.gitignore
+.runtime
+__pycache__/
+*.pyc
+.DS_Store
+app/.next
+app/.env.local
+app/node_modules
+data
+data_cleaned
+hvac_data
+output_summaries
+pipeline/output

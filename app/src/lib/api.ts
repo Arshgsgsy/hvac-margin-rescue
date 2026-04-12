@@ -8,7 +8,8 @@ import {
 } from './types'
 
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const rawApiBase = process.env.NEXT_PUBLIC_API_URL?.trim()
+const API_BASE = (rawApiBase ? rawApiBase : '/api').replace(/\/$/, '')
 
 
 async function readError(res: Response): Promise<string> {
