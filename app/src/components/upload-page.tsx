@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar, ChevronDown } from 'lucide-react'
 import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
 import { Project } from '@/lib/types'
 import { InvestigateModal } from './investigate-modal'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid } from 'recharts'
 
 interface UploadedFile {
   name: string
@@ -159,6 +160,15 @@ const STEPS: StepDef[] = [
 
 type StepStatus = 'idle' | 'running' | 'complete'
 
+// Time range options
+const TIME_RANGES = [
+  { id: '1m', label: '1 Month' },
+  { id: '1q', label: '1 Quarter' },
+  { id: '6m', label: '6 Months' },
+  { id: '1y', label: '1 Year' },
+  { id: 'custom', label: 'Custom' },
+]
+
 export function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
@@ -178,6 +188,12 @@ export function UploadPage() {
 
   // Investigate modal
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+
+  // Time range filter
+  const [selectedTimeRange, setSelectedTimeRange] = useState('1y')
+  const [customStartDate, setCustomStartDate] = useState('2024-01-01')
+  const [customEndDate, setCustomEndDate] = useState('2024-12-31')
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false)
 
   useEffect(() => { return () => { runningRef.current = false } }, [])
 
@@ -292,6 +308,27 @@ export function UploadPage() {
     return sum + (p.recoveryActions?.reduce((s, a) => s + a.amount, 0) || 0)
   }, 0)
   const avgMarginErosion = MOCK_PROJECTS.reduce((sum, p) => sum + Math.abs(p.marginDelta), 0) / MOCK_PROJECTS.length
+
+  // Chart data
+  const severityChartData = [
+    { name: 'Critical', value: criticalProjects.length, color: '#ef4444' },
+    { name: 'Elevated', value: warningProjects.length, color: '#f97316' },
+    { name: 'Monitor', value: watchProjects.length, color: '#eab308' },
+  ]
+
+  const overrunByCategory = [
+    { category: 'Labor', amount: MOCK_PROJECTS.reduce((s, p) => s + p.laborOverrun, 0) },
+    { category: 'Material', amount: MOCK_PROJECTS.reduce((s, p) => s + p.materialOverrun, 0) },
+  ]
+
+  const monthlyTrendData = [
+    { month: 'Jan', overrun: 180000, recovered: 45000 },
+    { month: 'Feb', overrun: 220000, recovered: 80000 },
+    { month: 'Mar', overrun: 310000, recovered: 120000 },
+    { month: 'Apr', overrun: 280000, recovered: 95000 },
+    { month: 'May', overrun: 350000, recovered: 180000 },
+    { month: 'Jun', overrun: 420000, recovered: 210000 },
+  ]
 
   // Render project row
   const renderProjectRow = (project: Project) => (
@@ -651,11 +688,11 @@ export function UploadPage() {
                   <div className="text-sm text-muted-foreground mt-1">Flagged Projects</div>
                 </div>
 
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
-                    <TrendingDown className="w-6 h-6 text-amber-500" />
+                <div className="rounded-2xl border border-orange-500/30 bg-orange-500/5 p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mx-auto mb-3">
+                    <TrendingDown className="w-6 h-6 text-orange-500" />
                   </div>
-                  <div className="text-4xl font-bold text-amber-500">{formatCurrency(totalOverrun)}</div>
+                  <div className="text-4xl font-bold text-orange-500">{formatCurrency(totalOverrun)}</div>
                   <div className="text-sm text-muted-foreground mt-1">Total Overrun Exposure</div>
                 </div>
 
@@ -693,7 +730,7 @@ export function UploadPage() {
                   <div className="w-12 h-12 rounded-xl bg-destructive/20 flex items-center justify-center flex-shrink-0">
                     <AlertCircle className="w-6 h-6 text-destructive" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-bold text-foreground">Biggest Issue: {criticalProjects[0]?.name}</h3>
                     <p className="text-muted-foreground mt-1">{criticalProjects[0]?.rootCause}</p>
                     <div className="flex gap-4 mt-3">
@@ -710,16 +747,225 @@ export function UploadPage() {
                 </div>
               </div>
 
+              {/* General Recommendations Section */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-foreground">General Recommendations</h3>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Supply Chain / Logistics Issue */}
+                  <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                        <Truck className="w-5 h-5 text-orange-500" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-foreground">Supply Chain & Delivery Issues Detected</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          3 of 8 flagged projects show significant delays and cost overruns related to material delivery and supplier coordination.
+                        </p>
+                        <div className="mt-3 p-3 rounded-lg bg-background/50 border border-border">
+                          <p className="text-sm font-medium text-foreground">Recommended Action:</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Schedule a meeting with the logistics and procurement team to review supplier contracts, delivery SLAs, and implement better tracking mechanisms.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coordination / Management Issue */}
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <Users className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-foreground">GC Coordination Failures Pattern</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          4 of 8 flagged projects indicate general contractor coordination issues leading to rework and scheduling conflicts.
+                        </p>
+                        <div className="mt-3 p-3 rounded-lg bg-background/50 border border-border">
+                          <p className="text-sm font-medium text-foreground">Recommended Action:</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Implement weekly coordination meetings with GCs on all active projects. Consider adding contract clauses for coordination accountability.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Time Range Filter Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground">Historical Analysis</h3>
+                    <p className="text-sm text-muted-foreground">View data across different time periods</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Adjust time range:</span>
+                  </div>
+                </div>
+
+                {/* Time range buttons */}
+                <div className="flex flex-wrap gap-2">
+                  {TIME_RANGES.map((range) => (
+                    <button
+                      key={range.id}
+                      onClick={() => {
+                        setSelectedTimeRange(range.id)
+                        setShowCustomDatePicker(range.id === 'custom')
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedTimeRange === range.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {range.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom date picker */}
+                {showCustomDatePicker && (
+                  <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground">From:</label>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground">To:</label>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
+                      />
+                    </div>
+                    <button className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+                      Apply
+                    </button>
+                  </div>
+                )}
+
+                {/* Charts with explanations */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Severity Distribution Pie Chart */}
+                  <div className="rounded-xl border border-border bg-card p-5">
+                    <h4 className="font-semibold text-foreground mb-2">Projects by Severity Level</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      This chart shows how flagged projects are distributed across severity levels. Critical projects need immediate attention, while Monitor projects should be tracked for potential escalation.
+                    </p>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={severityChartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={3}
+                            dataKey="value"
+                            label={({ name, value }) => `${name}: ${value}`}
+                          >
+                            {severityChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Overrun by Category Bar Chart */}
+                  <div className="rounded-xl border border-border bg-card p-5">
+                    <h4 className="font-semibold text-foreground mb-2">Cost Overrun by Category</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Labor costs are typically the largest contributor to project overruns. This breakdown helps identify whether to focus on workforce management or material procurement.
+                    </p>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={overrunByCategory}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="category" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                          <YAxis 
+                            tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          />
+                          <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Monthly Trend Line Chart - full width */}
+                  <div className="rounded-xl border border-border bg-card p-5 lg:col-span-2">
+                    <h4 className="font-semibold text-foreground mb-2">Monthly Overrun vs Recovery Trend</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Track how cost overruns and successful recoveries trend over time. A widening gap indicates growing exposure, while convergence shows effective cost control measures taking effect.
+                    </p>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={monthlyTrendData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="month" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                          <YAxis 
+                            tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [formatCurrency(value)]}
+                            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          />
+                          <Legend />
+                          <Line 
+                            type="monotone" 
+                            dataKey="overrun" 
+                            stroke="#ef4444" 
+                            strokeWidth={2}
+                            name="Overrun"
+                            dot={{ fill: '#ef4444' }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="recovered" 
+                            stroke="#10b981" 
+                            strokeWidth={2}
+                            name="Recovered"
+                            dot={{ fill: '#10b981' }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Projects by severity */}
               <div className="space-y-6">
                 <h3 className="text-xl font-bold text-foreground">Projects by Severity</h3>
 
-                {/* Critical */}
+                {/* Critical - Red */}
                 {criticalProjects.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-destructive" />
-                      <h4 className="font-semibold text-destructive">Critical - Immediate Action Required</h4>
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <h4 className="font-semibold text-red-500">Critical - Immediate Action Required</h4>
                       <span className="text-sm text-muted-foreground">({criticalProjects.length} projects)</span>
                     </div>
                     <div className="space-y-2">
@@ -728,12 +974,12 @@ export function UploadPage() {
                   </div>
                 )}
 
-                {/* Elevated */}
+                {/* Elevated - Orange */}
                 {warningProjects.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-amber-500" />
-                      <h4 className="font-semibold text-amber-500">Elevated - Attention This Week</h4>
+                      <div className="w-3 h-3 rounded-full bg-orange-500" />
+                      <h4 className="font-semibold text-orange-500">Elevated - Attention This Week</h4>
                       <span className="text-sm text-muted-foreground">({warningProjects.length} projects)</span>
                     </div>
                     <div className="space-y-2">
@@ -742,12 +988,12 @@ export function UploadPage() {
                   </div>
                 )}
 
-                {/* Monitor */}
+                {/* Monitor - Yellow */}
                 {watchProjects.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-blue-500" />
-                      <h4 className="font-semibold text-blue-500">Monitor - Track for Changes</h4>
+                      <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                      <h4 className="font-semibold text-yellow-500">Monitor - Track for Changes</h4>
                       <span className="text-sm text-muted-foreground">({watchProjects.length} projects)</span>
                     </div>
                     <div className="space-y-2">
