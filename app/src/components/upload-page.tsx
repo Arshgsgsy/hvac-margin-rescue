@@ -318,76 +318,88 @@ export function UploadPage({ onComplete }: UploadPageProps) {
               </div>
             )}
 
-            {/* Steps */}
-            <div className="space-y-3">
+            {/* Steps - idle steps are collapsed to a single line */}
+            <div className="space-y-2">
               {STEPS.map((step, i) => {
                 const status = statuses[i]
+                const isCollapsed = status === 'idle'
+                
                 return (
                   <div
                     key={step.id}
-                    className="rounded-xl border overflow-hidden transition-all duration-300"
+                    className={`rounded-xl border overflow-hidden transition-all duration-300 ${isCollapsed ? 'opacity-40' : ''}`}
                     style={{
                       borderColor: statusColor(status),
                       background: status === 'complete' ? 'rgba(16,185,129,0.08)' : status === 'running' ? 'rgba(59,130,246,0.08)' : 'hsl(var(--card))',
-                      opacity: status === 'idle' && running ? 0.5 : 1,
                     }}
                   >
-                    <div className="flex items-center gap-4 px-5 py-3">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                        style={{ background: statusColor(status), color: '#fff' }}
-                      >
-                        {status === 'complete' ? (
-                          <CheckCircle2 className="w-4 h-4" />
-                        ) : status === 'running' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <span className="text-muted-foreground">{i + 1}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="font-semibold text-foreground">{step.label}</span>
-                          <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
-                            {step.script}
-                          </code>
-                          {status === 'running' && (
-                            <span className="text-xs text-primary">running...</span>
-                          )}
-                          {status === 'complete' && (
-                            <span className="text-xs text-emerald-500">done</span>
-                          )}
+                    {/* Collapsed view for idle steps */}
+                    {isCollapsed ? (
+                      <div className="flex items-center gap-3 px-4 py-2">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium bg-muted text-muted-foreground flex-shrink-0">
+                          {i + 1}
                         </div>
-                        <p className="text-xs mt-0.5 text-muted-foreground">{step.description}</p>
+                        <span className="text-sm text-muted-foreground">{step.label}</span>
                       </div>
-                    </div>
-
-                    {(status === 'running' || status === 'complete') && visibleLogs[i].length > 0 && (
-                      <div
-                        ref={(el) => { logRefs.current[i] = el }}
-                        className="border-t border-border/30 px-5 py-3 font-mono text-xs overflow-y-auto bg-card/50"
-                        style={{ maxHeight: '180px' }}
-                      >
-                        {visibleLogs[i].map((line, j) => (
+                    ) : (
+                      <>
+                        {/* Expanded view for running/complete steps */}
+                        <div className="flex items-center gap-4 px-5 py-3">
                           <div
-                            key={j}
-                            className="leading-relaxed"
-                            style={{
-                              color: line.startsWith('[DONE]') ? '#10b981'
-                                : line.includes('CRITICAL') ? '#ef4444'
-                                : line.includes('WARNING') ? '#f59e0b'
-                                : line.startsWith('---') ? 'hsl(var(--border))'
-                                : line.startsWith('  ') ? 'hsl(var(--muted-foreground))'
-                                : 'hsl(var(--muted-foreground))',
-                            }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ background: statusColor(status), color: '#fff' }}
                           >
-                            {line.startsWith('[DONE]') ? '' : '> '}{line}
+                            {status === 'complete' ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            )}
                           </div>
-                        ))}
-                        {status === 'running' && (
-                          <span className="text-primary animate-pulse">|</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="font-semibold text-foreground">{step.label}</span>
+                              <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
+                                {step.script}
+                              </code>
+                              {status === 'running' && (
+                                <span className="text-xs text-primary">running...</span>
+                              )}
+                              {status === 'complete' && (
+                                <span className="text-xs text-emerald-500">done</span>
+                              )}
+                            </div>
+                            <p className="text-xs mt-0.5 text-muted-foreground">{step.description}</p>
+                          </div>
+                        </div>
+
+                        {visibleLogs[i].length > 0 && (
+                          <div
+                            ref={(el) => { logRefs.current[i] = el }}
+                            className="border-t border-border/30 px-5 py-3 font-mono text-xs overflow-y-auto bg-card/50"
+                            style={{ maxHeight: '180px' }}
+                          >
+                            {visibleLogs[i].map((line, j) => (
+                              <div
+                                key={j}
+                                className="leading-relaxed"
+                                style={{
+                                  color: line.startsWith('[DONE]') ? '#10b981'
+                                    : line.includes('CRITICAL') ? '#ef4444'
+                                    : line.includes('WARNING') ? '#f59e0b'
+                                    : line.startsWith('---') ? 'hsl(var(--border))'
+                                    : line.startsWith('  ') ? 'hsl(var(--muted-foreground))'
+                                    : 'hsl(var(--muted-foreground))',
+                                }}
+                              >
+                                {line.startsWith('[DONE]') ? '' : '> '}{line}
+                              </div>
+                            ))}
+                            {status === 'running' && (
+                              <span className="text-primary animate-pulse">|</span>
+                            )}
+                          </div>
                         )}
-                      </div>
+                      </>
                     )}
                   </div>
                 )
