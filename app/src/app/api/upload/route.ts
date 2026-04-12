@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
     }
 
-    const extractedFiles: { name: string; size: number }[] = []
+    const extractedFiles: { name: string; size: number; content: string }[] = []
 
     // Check if it's a ZIP file
     if (file.name.endsWith('.zip')) {
@@ -38,13 +38,23 @@ export async function POST(request: NextRequest) {
         const baseName = filename.split('/').pop() || filename
         
         if (baseName.endsWith('.csv')) {
-          const content = await zipEntry.async('blob')
-          extractedFiles.push({ name: baseName, size: content.size })
+          // Get the actual CSV content as text
+          const content = await zipEntry.async('string')
+          extractedFiles.push({ 
+            name: baseName, 
+            size: content.length,
+            content: content
+          })
         }
       }
     } else if (file.name.endsWith('.csv')) {
-      // Single CSV file
-      extractedFiles.push({ name: file.name, size: file.size })
+      // Single CSV file - read content
+      const content = await file.text()
+      extractedFiles.push({ 
+        name: file.name, 
+        size: content.length,
+        content: content
+      })
     } else {
       return NextResponse.json({ 
         error: 'Invalid file type. Please upload a ZIP file containing CSVs or individual CSV files.' 
@@ -56,9 +66,16 @@ export async function POST(request: NextRequest) {
     const missingFiles = EXPECTED_CSV_FILES.filter(f => !extractedNames.includes(f))
     const foundFiles = EXPECTED_CSV_FILES.filter(f => extractedNames.includes(f))
     
+    // Build csvFiles map for pipeline
+    const csvFiles: Record<string, string> = {}
+    for (const file of extractedFiles) {
+      csvFiles[file.name] = file.content
+    }
+    
     return NextResponse.json({
       status: 'ok',
-      files: extractedFiles,
+      files: extractedFiles.map(f => ({ name: f.name, size: f.size })),
+      csvFiles, // Include actual CSV content for pipeline
       expectedFiles: EXPECTED_CSV_FILES,
       foundFiles,
       missingFiles,

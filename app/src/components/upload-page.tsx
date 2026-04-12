@@ -218,13 +218,77 @@ export function UploadPage() {
       .catch(() => setBackendConnected(true)) // Default to true for demo
   }, [])
 
+  // Store actual File objects and CSV content for upload
+  const [actualFiles, setActualFiles] = useState<File[]>([])
+  const [csvData, setCsvData] = useState<Record<string, string>>({})
+  const [pipelineResult, setPipelineResult] = useState<{
+    summary?: { total_projects: number; flagged_count: number; critical_count: number }
+    flagged_projects?: Array<{ project_id: string; project_name: string; severity: string }>
+  } | null>(null)
+
   const runPipeline = async () => {
     if (running || done) return
     setPipelineStarted(true)
     setRunning(true)
     runningRef.current = true
 
-    // Run pipeline simulation with animated logs
+    // Check if we have real CSV data to process
+    const hasRealData = Object.keys(csvData).length > 0
+
+    if (hasRealData) {
+      // Run REAL pipeline with actual data
+      try {
+        // Show initial status
+        setStatuses((prev) => { const n = [...prev]; n[0] = 'running'; return n })
+        setVisibleLogs((prev) => {
+          const n = prev.map((l) => [...l])
+          n[0] = ['[PIPELINE] Processing uploaded CSV data...', `[PIPELINE] Found ${Object.keys(csvData).length} CSV files`]
+          return n
+        })
+
+        const response = await fetch('/api/pipeline/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ csvFiles: csvData }),
+        })
+
+        const result = await response.json()
+
+        if (result.status === 'complete' && result.steps) {
+          // Update UI with real pipeline results
+          for (let i = 0; i < result.steps.length && i < STEPS.length; i++) {
+            const backendStep = result.steps[i]
+            setStatuses((prev) => { 
+              const n = [...prev]
+              n[i] = backendStep.status === 'complete' ? 'complete' : 
+                     backendStep.status === 'error' ? 'error' : 'idle'
+              return n 
+            })
+            setVisibleLogs((prev) => {
+              const n = prev.map((l) => [...l])
+              n[i] = backendStep.logs || []
+              return n
+            })
+            // Small delay between steps for visual effect
+            await new Promise((r) => setTimeout(r, 300))
+          }
+          
+          // Store the results
+          setPipelineResult({
+            summary: result.summary,
+            flagged_projects: result.flagged_projects,
+          })
+        }
+
+        setRunning(false)
+        setDone(true)
+        return
+      } catch (error) {
+        console.error('[v0] Pipeline error, falling back to simulation:', error)
+      }
+    }
+
+    // Fallback: Run simulation with animated logs (no real data)
     for (let i = 0; i < STEPS.length; i++) {
       if (!runningRef.current) break
       const step = STEPS[i]
@@ -251,9 +315,6 @@ export function UploadPage() {
     setDone(true)
   }
 
-  // Store actual File objects for upload
-  const [actualFiles, setActualFiles] = useState<File[]>([])
-
   const handleFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return
     
@@ -276,7 +337,7 @@ export function UploadPage() {
       setIsUploading(true)
       
       try {
-        // Upload each file to the API
+        // Upload each file to the API and collect CSV data
         for (const file of newActualFiles) {
           const formData = new FormData()
           formData.append('file', file)
@@ -286,21 +347,17 @@ export function UploadPage() {
             body: formData,
           })
           
+          // Parse response body once
+          const result = await response.json()
+          
           if (!response.ok) {
-            // Try to parse error, fallback to text
-            let errorMsg = 'Upload failed'
-            try {
-              const errorData = await response.json()
-              errorMsg = errorData.error || errorMsg
-            } catch {
-              errorMsg = await response.text() || errorMsg
-            }
-            throw new Error(errorMsg)
+            throw new Error(result.error || 'Upload failed')
           }
           
-          // Success - log the result
-          const result = await response.json()
-          console.log('[v0] Upload result:', result)
+          // Store CSV content for pipeline
+          if (result.csvFiles) {
+            setCsvData(prev => ({ ...prev, ...result.csvFiles }))
+          }
         }
         
         setFiles(prev => [...prev, ...newFiles])
@@ -308,7 +365,6 @@ export function UploadPage() {
         setUploadComplete(true)
       } catch (error) {
         console.error('[v0] Upload error:', error)
-        // Still show files locally for demo - just log the error
         setFiles(prev => [...prev, ...newFiles])
         setActualFiles(prev => [...prev, ...newActualFiles])
         setUploadComplete(true)
