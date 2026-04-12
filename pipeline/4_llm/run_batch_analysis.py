@@ -19,7 +19,6 @@ Supports parallel processing for 4-5x speedup:
 
 import asyncio
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -32,7 +31,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
-from backend.config import DATA_DIR
+from backend.config import DATA_DIR, OPENAI_API_KEY
 from constants import (
     RETENTION_RATE,
     STAGE_COMPLETE_THRESHOLD,
@@ -47,9 +46,9 @@ from constants import (
 )
 
 try:
-    from anthropic import Anthropic
+    import openai
 except ImportError:
-    Anthropic = None
+    openai = None
 
 try:
     import jsonschema
@@ -370,40 +369,45 @@ def extract_json_from_response(text: str) -> dict:
     raise ValueError("No JSON found in response")
 
 
+def _require_openai_client() -> None:
+    """Ensure the OpenAI SDK and API key are configured before making LLM calls."""
+    if openai is None:
+        raise ImportError("openai package not installed")
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not configured.")
+
+
 def call_diagnosis_agent(packet: dict) -> dict:
     """Call Agent 1 to diagnose the project"""
-    if Anthropic is None:
-        raise ImportError("anthropic package not installed")
-
-    client = Anthropic()
-
-    response = client.messages.create(
+    _require_openai_client()
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
-        system=DIAGNOSIS_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"Analyze this project and return ONLY a JSON object:\n\n{json.dumps(packet, indent=2)}"
-        }]
+        max_completion_tokens=LLM_MAX_TOKENS_ANALYSIS,
+        messages=[
+            {"role": "system", "content": DIAGNOSIS_PROMPT},
+            {
+                "role": "user",
+                "content": f"Analyze this project and return ONLY a JSON object:\n\n{json.dumps(packet, indent=2)}"
+            }
+        ],
     )
 
-    return extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.choices[0].message.content)
 
 
 def call_recommendation_agent(diagnosis: dict, packet: dict) -> dict:
     """Call Agent 2 to generate recommendations"""
-    if Anthropic is None:
-        raise ImportError("anthropic package not installed")
-
-    client = Anthropic()
-
-    response = client.messages.create(
+    _require_openai_client()
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
-        system=RECOMMENDATION_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"""Generate recovery recommendations and return ONLY a JSON object.
+        max_completion_tokens=LLM_MAX_TOKENS_ANALYSIS,
+        messages=[
+            {"role": "system", "content": RECOMMENDATION_PROMPT},
+            {
+                "role": "user",
+                "content": f"""Generate recovery recommendations and return ONLY a JSON object.
 
 DIAGNOSIS:
 {json.dumps(diagnosis, indent=2)}
@@ -411,10 +415,11 @@ DIAGNOSIS:
 PROJECT PACKET:
 {json.dumps(packet, indent=2)}
 """
-        }]
+            }
+        ],
     )
 
-    return extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.choices[0].message.content)
 
 
 def validate_against_schema(data: dict, schema_path: Path) -> tuple[bool, list[str]]:
@@ -541,16 +546,16 @@ def run_batch_analysis(dry_run: bool = False, use_hybrid: bool = True) -> list[d
                     print(f"  Warning: Project not found in management summary, using legacy")
                     packet = build_project_packet(project)
                 else:
-                    field_count = packet.get("field_notes", {}).get("total_count", 0)
+                    field_count = packet.get("text_evidence", {}).get("field_notes_count", 0)
                     print(f"  Hybrid packet: {field_count} field notes loaded")
             else:
                 packet = build_project_packet(project)
 
             if dry_run:
-                if use_hybrid and "pre_computed_metrics" in packet:
+                if use_hybrid and "contract_value" not in packet.get("financials", {}):
                     print(f"  [DRY RUN] Would analyze hybrid packet:")
-                    print(f"    Risk Level: {packet['project']['risk_level']}")
-                    print(f"    Field Notes: {packet['field_notes']['total_count']}")
+                    print(f"    Risk Level: {packet['project'].get('risk_level', 'unknown')}")
+                    print(f"    Field Notes: {packet.get('text_evidence', {}).get('field_notes_count', 0)}")
                 else:
                     print(f"  [DRY RUN] Would analyze legacy packet:")
                     print(f"    Contract: ${packet['financials']['contract_value']:,.0f}")

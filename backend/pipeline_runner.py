@@ -1,11 +1,10 @@
-import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Callable
 
-from config import DATA_DIR, PIPELINE_DIR, PROJECT_ROOT, sync_hvac_data_link
+from config import DATA_DIR, OPENAI_API_KEY, PIPELINE_DIR, PROJECT_ROOT, sync_hvac_data_link
 
 
 ProgressCallback = Callable[[dict], None]
@@ -214,12 +213,12 @@ def _run_solution_stages(
     completed_steps: list[dict],
     progress_callback: ProgressCallback | None = None,
 ) -> list[dict]:
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    if not OPENAI_API_KEY:
         results = [
             _step_payload(
                 step,
                 status="complete",
-                logs=["[SKIP] ANTHROPIC_API_KEY is not configured. Running in analytics-only mode."],
+                logs=["[SKIP] OPENAI_API_KEY is not configured. Running in analytics-only mode."],
             )
             for step in SOLUTION_STEPS
         ]
