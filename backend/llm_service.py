@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import anthropic
 from config import ANTHROPIC_API_KEY
+from data_transformer import load_single_project
 from prompts import (
     SYSTEM_PROMPT,
     DIAGNOSIS_SYSTEM_PROMPT,
@@ -179,6 +180,18 @@ def analyze_project_sync(project: dict) -> dict:
     return full_analysis
 
 
+def _build_analysis_packet(project_id: str) -> dict | None:
+    packet = build_hybrid_project_packet(project_id)
+    if packet is not None:
+        return packet
+
+    project = load_single_project(project_id)
+    if project is None:
+        return None
+
+    return build_project_packet(project)
+
+
 def analyze_project_hybrid_sync(project_id: str) -> dict | None:
     """
     Full 2-agent analysis using hybrid approach (sync version):
@@ -187,7 +200,7 @@ def analyze_project_hybrid_sync(project_id: str) -> dict | None:
     - Includes full CO/RFI details
     """
     # Build hybrid packet from CSV data
-    packet = build_hybrid_project_packet(project_id)
+    packet = _build_analysis_packet(project_id)
     if packet is None:
         return None
 
@@ -211,7 +224,7 @@ async def analyze_project_hybrid(project_id: str) -> dict | None:
     - Includes full CO/RFI details
     """
     # Build hybrid packet from CSV data
-    packet = build_hybrid_project_packet(project_id)
+    packet = _build_analysis_packet(project_id)
     if packet is None:
         return None
 

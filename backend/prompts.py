@@ -43,16 +43,17 @@ def clear_csv_cache():
     _csv_cache.clear()
 
 
-def _row_value(row: pd.Series, column: str, default=None):
-    if column not in row.index or pd.isna(row[column]):
+def _series_value(row: pd.Series, key: str, default=None):
+    value = row.get(key, default)
+    if value is None or pd.isna(value):
         return default
-    return row[column]
+    return value
 
 
 def get_management_summary(project_id: str) -> dict | None:
     """Get pre-computed metrics from management_project_summary.csv"""
     df = _load_csv("management_project_summary.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return None
 
     if "project_id" not in df.columns:
@@ -65,55 +66,57 @@ def get_management_summary(project_id: str) -> dict | None:
 
     row = row.iloc[0]
     return {
-        "project_id": _row_value(row, "project_id"),
-        "project_name": _row_value(row, "project_name"),
-        "gc_name": _row_value(row, "gc_name"),
-        "risk_level": _row_value(row, "risk_level"),
-        "risk_score": _row_value(row, "risk_score"),
-        "main_issue": _row_value(row, "main_issue"),
-        "alert_class": _row_value(row, "alert_class"),
-        "trigger_score": _row_value(row, "trigger_score"),
-        "primary_trigger": _row_value(row, "primary_trigger"),
-        "supporting_triggers": _row_value(row, "supporting_triggers"),
-        "fired_triggers": _row_value(row, "fired_triggers"),
-        "why_now": _row_value(row, "why_now"),
-        "realized_margin_pct": _row_value(row, "realized_margin_pct"),
-        "cost_vs_budget": _row_value(row, "cost_vs_budget"),
-        "billing_gap_pct": _row_value(row, "billing_gap_pct"),
-        "approved_co_pct": _row_value(row, "approved_co_pct"),
-        "rejected_co_pct": _row_value(row, "rejected_co_pct"),
-        "pending_co_pct": _row_value(row, "pending_co_pct"),
-        "max_open_rfi_age": _row_value(row, "max_open_rfi_age"),
-        "total_rfis": int(_row_value(row, "total_rfis", 0) or 0),
-        "labor_burn_ratio": _row_value(row, "labor_burn_ratio"),
-        "labor_avg_pct_overrun": _row_value(row, "labor_avg_pct_overrun"),
-        "material_avg_pct_overrun": _row_value(row, "material_avg_pct_overrun"),
-        "overtime_spike": _row_value(row, "overtime_spike"),
-        "burn_rate_acceleration": _row_value(row, "burn_rate_acceleration"),
-        "crew_size_spike": _row_value(row, "crew_size_spike"),
-        "forecast_to_complete_trend": _row_value(row, "forecast_to_complete_trend"),
-        "management_cause": _row_value(row, "management_cause"),
-        "evidence": _row_value(row, "evidence"),
-        "recommended_action": _row_value(row, "recommended_action"),
-        "severity": _row_value(row, "severity"),
+        "project_id": _series_value(row, "project_id", project_id),
+        "project_name": _series_value(row, "project_name", project_id),
+        "gc_name": _series_value(row, "gc_name", ""),
+        "risk_level": _series_value(row, "risk_level", "UNKNOWN"),
+        "risk_score": _series_value(row, "risk_score"),
+        "main_issue": _series_value(row, "main_issue", "Unknown"),
+        "alert_class": _series_value(row, "alert_class"),
+        "trigger_score": _series_value(row, "trigger_score"),
+        "primary_trigger": _series_value(row, "primary_trigger"),
+        "supporting_triggers": _series_value(row, "supporting_triggers"),
+        "fired_triggers": _series_value(row, "fired_triggers"),
+        "why_now": _series_value(row, "why_now"),
+        "realized_margin_pct": _series_value(row, "realized_margin_pct"),
+        "cost_vs_budget": _series_value(row, "cost_vs_budget"),
+        "billing_gap_pct": _series_value(row, "billing_gap_pct"),
+        "approved_co_pct": _series_value(row, "approved_co_pct"),
+        "rejected_co_pct": _series_value(row, "rejected_co_pct"),
+        "pending_co_pct": _series_value(row, "pending_co_pct"),
+        "max_open_rfi_age": _series_value(row, "max_open_rfi_age"),
+        "total_rfis": int(_series_value(row, "total_rfis", 0) or 0),
+        "labor_burn_ratio": _series_value(row, "labor_burn_ratio"),
+        "labor_avg_pct_overrun": _series_value(row, "labor_avg_pct_overrun"),
+        "material_avg_pct_overrun": _series_value(row, "material_avg_pct_overrun"),
+        "overtime_spike": _series_value(row, "overtime_spike"),
+        "burn_rate_acceleration": _series_value(row, "burn_rate_acceleration"),
+        "crew_size_spike": _series_value(row, "crew_size_spike"),
+        "forecast_to_complete_trend": _series_value(row, "forecast_to_complete_trend"),
+        "management_cause": _series_value(row, "management_cause", "Mixed / monitor"),
+        "evidence": _series_value(row, "evidence", "No evidence summary available"),
+        "recommended_action": _series_value(row, "recommended_action", "Review project"),
+        "severity": _series_value(row, "severity", "Moderate"),
     }
 
 
 def get_all_field_notes(project_id: str) -> list[dict]:
     """Get ALL field notes for a project from field_notes_all.csv"""
     df = _load_csv("field_notes_all.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return []
 
-    proj_notes = df[df["project_id"] == project_id].sort_values("date", ascending=False)
+    proj_notes = df[df["project_id"] == project_id]
+    if "date" in proj_notes.columns:
+        proj_notes = proj_notes.sort_values("date", ascending=False)
 
     notes = []
     for _, row in proj_notes.iterrows():
         notes.append({
-            "date": row["date"],
-            "author": row["author"],
-            "note_type": row["note_type"],
-            "content": row["content"],
+            "date": _series_value(row, "date", ""),
+            "author": _series_value(row, "author", ""),
+            "note_type": _series_value(row, "note_type", ""),
+            "content": _series_value(row, "content", ""),
         })
 
     return notes
@@ -122,7 +125,7 @@ def get_all_field_notes(project_id: str) -> list[dict]:
 def get_change_orders(project_id: str) -> list[dict]:
     """Get all change orders for a project"""
     df = _load_csv("change_orders_all.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return []
 
     proj_cos = df[df["project_id"] == project_id]
@@ -130,11 +133,11 @@ def get_change_orders(project_id: str) -> list[dict]:
     cos = []
     for _, row in proj_cos.iterrows():
         cos.append({
-            "co_number": row["co_number"],
-            "description": row["description"],
-            "amount": row["amount"],
-            "status": row["status"],
-            "reason_category": row["reason_category"],
+            "co_number": _series_value(row, "co_number", ""),
+            "description": _series_value(row, "description", ""),
+            "amount": _series_value(row, "amount", 0),
+            "status": _series_value(row, "status", ""),
+            "reason_category": _series_value(row, "reason_category", ""),
         })
 
     return cos
@@ -143,7 +146,7 @@ def get_change_orders(project_id: str) -> list[dict]:
 def get_rfis(project_id: str) -> list[dict]:
     """Get all RFIs for a project"""
     df = _load_csv("rfis_all.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return []
 
     proj_rfis = df[df["project_id"] == project_id]
@@ -151,11 +154,11 @@ def get_rfis(project_id: str) -> list[dict]:
     rfis = []
     for _, row in proj_rfis.iterrows():
         rfis.append({
-            "rfi_number": row["rfi_number"],
-            "subject": row["subject"],
-            "status": row["status"],
-            "priority": row.get("priority", ""),
-            "cost_impact": row.get("cost_impact", False),
+            "rfi_number": _series_value(row, "rfi_number", ""),
+            "subject": _series_value(row, "subject", ""),
+            "status": _series_value(row, "status", ""),
+            "priority": _series_value(row, "priority", ""),
+            "cost_impact": _series_value(row, "cost_impact", False),
         })
 
     return rfis

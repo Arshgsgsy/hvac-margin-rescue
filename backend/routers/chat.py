@@ -15,7 +15,11 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 def chat_endpoint(req: ChatRequest):
-    project = load_single_project(req.project_id)
+    try:
+        project = load_single_project(req.project_id)
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc)) from exc
+
     if not project:
         raise HTTPException(404, f"Project '{req.project_id}' not found")
     if not ANTHROPIC_API_KEY:

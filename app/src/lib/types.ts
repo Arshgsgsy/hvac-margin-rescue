@@ -118,6 +118,15 @@ export interface ProjectMoneyBrief {
   break_even_recovery_needed?: number | null
 }
 
+export interface RecoveryActionRich {
+  priority: number
+  action: string
+  owner: 'Project Manager' | 'Finance' | 'Operations' | 'Executive'
+  financial_logic: string
+  estimated_recovery_dollars: number | null
+  urgency: 'immediate' | 'this_week' | 'this_month' | 'ongoing'
+}
+
 export interface Project {
   [key: string]: any
   id: string
@@ -201,6 +210,7 @@ export interface Project {
   rfi_by_week: RFIWeek[]
   llm_financial_snapshot?: Record<string, any> | null
   recoverability_summary?: Record<string, any> | null
+  recovery_actions_rich?: RecoveryActionRich[]
 }
 
 export interface ThisWeekPlanAction {

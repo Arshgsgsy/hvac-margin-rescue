@@ -19,8 +19,8 @@ def _read_json(path: Path):
         return None
     try:
         return json.loads(path.read_text())
-    except json.JSONDecodeError:
-        return None
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Failed to parse JSON '{path}': {exc}") from exc
 
 
 def _read_csv(path: Path) -> pd.DataFrame | None:
@@ -28,8 +28,8 @@ def _read_csv(path: Path) -> pd.DataFrame | None:
         return None
     try:
         return pd.read_csv(path, low_memory=False)
-    except Exception:
-        return None
+    except Exception as exc:
+        raise RuntimeError(f"Failed to read CSV '{path}': {exc}") from exc
 
 
 def _coerce_number(value, default=0.0):

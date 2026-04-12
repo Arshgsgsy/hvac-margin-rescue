@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Project } from '@/lib/types'
+import { Project, RecoveryActionRich } from '@/lib/types'
 import { formatCurrency, formatPercent } from '@/lib/data'
-import { 
-  X, AlertTriangle, ListChecks, BarChart3, TrendingDown, DollarSign, ArrowRight, CheckCircle2,
+import {
+  X, AlertTriangle, ListChecks, BarChart3, TrendingDown, TrendingUp, DollarSign, ArrowRight, CheckCircle2,
   LayoutDashboard, Layers, Users, AlertCircle, FileText
 } from 'lucide-react'
 import {
@@ -385,9 +385,87 @@ interface TabProps {
   totalOverrun?: number
 }
 
+// Urgency badge styling helper
+function getUrgencyStyle(urgency: RecoveryActionRich['urgency']) {
+  switch (urgency) {
+    case 'immediate':
+      return 'bg-red-500/20 text-red-400 border-red-500/30'
+    case 'this_week':
+      return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+    case 'this_month':
+      return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+    case 'ongoing':
+      return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+    default:
+      return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+  }
+}
+
+// Owner badge styling helper
+function getOwnerStyle(owner: RecoveryActionRich['owner']) {
+  switch (owner) {
+    case 'Project Manager':
+      return 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+    case 'Finance':
+      return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+    case 'Operations':
+      return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+    case 'Executive':
+      return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+    default:
+      return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+  }
+}
+
+// Format urgency for display
+function formatUrgency(urgency: RecoveryActionRich['urgency']) {
+  switch (urgency) {
+    case 'immediate':
+      return 'Immediate'
+    case 'this_week':
+      return 'This Week'
+    case 'this_month':
+      return 'This Month'
+    case 'ongoing':
+      return 'Ongoing'
+    default:
+      return urgency
+  }
+}
+
 function RecommendationTab({ project, config, totalOverrun }: TabProps) {
+  const hasForecasts = project.forecast_if_no_action && project.forecast_with_action
+  const hasRichActions = project.recovery_actions_rich && project.recovery_actions_rich.length > 0
+
   return (
     <div className="space-y-6">
+      {/* Urgency Section - If You Don't Act vs With These Actions */}
+      {hasForecasts && (
+        <div className="grid grid-cols-2 gap-4">
+          {/* No Action Scenario */}
+          <div className="rounded-xl p-5 bg-red-500/10 border-2 border-red-500/40">
+            <div className="flex items-start gap-3">
+              <TrendingDown className="w-6 h-6 text-red-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-red-400 mb-2">If You Don't Act</h3>
+                <p className="text-sm text-foreground leading-relaxed">{project.forecast_if_no_action}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* With Action Scenario */}
+          <div className="rounded-xl p-5 bg-emerald-500/10 border-2 border-emerald-500/40">
+            <div className="flex items-start gap-3">
+              <TrendingUp className="w-6 h-6 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-emerald-400 mb-2">With These Actions</h3>
+                <p className="text-sm text-foreground leading-relaxed">{project.forecast_with_action}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Critical Issue Summary */}
       <div className={`rounded-xl p-5 ${config?.bg} border ${config?.border}`}>
         <div className="flex items-start gap-3">
@@ -420,34 +498,77 @@ function RecommendationTab({ project, config, totalOverrun }: TabProps) {
         </div>
       </div>
 
-      {/* Recovery Actions */}
+      {/* Recovery Actions - Rich version if available */}
       <div>
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
           <ListChecks className="w-5 h-5 text-primary" />
           Recommended Actions
         </h3>
         <div className="space-y-3">
-          {(project.recoveryActions ?? []).map((action, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${
-                  action.priority === 'high' ? 'bg-red-500' : 
-                  action.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
-                }`} />
-                <div>
-                  <p className="text-sm font-medium text-foreground">{action.description}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{action.priority} priority | {action.category.replace('_', ' ')}</p>
+          {hasRichActions ? (
+            // Rich action cards with owner, urgency, and financial logic
+            project.recovery_actions_rich!.map((action, index) => (
+              <div
+                key={index}
+                className="p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors"
+              >
+                {/* Action header with priority number and description */}
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div className="flex items-start gap-3 flex-1">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm font-bold flex items-center justify-center">
+                      {action.priority}
+                    </span>
+                    <p className="text-sm font-medium text-foreground leading-relaxed">{action.action}</p>
+                  </div>
+                  {action.estimated_recovery_dollars && (
+                    <span className="text-sm font-bold text-emerald-400 whitespace-nowrap">
+                      +{formatCurrency(action.estimated_recovery_dollars)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Badges row: Owner + Urgency */}
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`text-xs px-2 py-1 rounded-md border ${getOwnerStyle(action.owner)}`}>
+                    {action.owner}
+                  </span>
+                  <span className={`text-xs px-2 py-1 rounded-md border ${getUrgencyStyle(action.urgency)}`}>
+                    {formatUrgency(action.urgency)}
+                  </span>
+                </div>
+
+                {/* Financial logic - why this works */}
+                {action.financial_logic && (
+                  <p className="text-xs text-muted-foreground italic leading-relaxed pl-9">
+                    "{action.financial_logic}"
+                  </p>
+                )}
+              </div>
+            ))
+          ) : (
+            // Fallback to simple action cards
+            (project.recoveryActions ?? []).map((action, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${
+                    action.priority === 'high' ? 'bg-red-500' :
+                    action.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
+                  }`} />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{action.description}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{action.priority} priority | {action.category.replace('_', ' ')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-emerald-400">+{formatCurrency(action.amount)}</span>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-emerald-400">+{formatCurrency(action.amount)}</span>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
