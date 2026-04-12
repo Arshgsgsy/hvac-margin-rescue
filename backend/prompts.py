@@ -43,10 +43,17 @@ def clear_csv_cache():
     _csv_cache.clear()
 
 
+def _series_value(row: pd.Series, key: str, default=None):
+    value = row.get(key, default)
+    if value is None or pd.isna(value):
+        return default
+    return value
+
+
 def get_management_summary(project_id: str) -> dict | None:
     """Get pre-computed metrics from management_project_summary.csv"""
     df = _load_csv("management_project_summary.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return None
 
     row = df[df["project_id"] == project_id]
@@ -55,42 +62,44 @@ def get_management_summary(project_id: str) -> dict | None:
 
     row = row.iloc[0]
     return {
-        "project_id": row["project_id"],
-        "project_name": row["project_name"],
-        "gc_name": row["gc_name"],
-        "risk_level": row["risk_level"],
-        "main_issue": row["main_issue"],
-        "realized_margin_pct": row["realized_margin_pct"],
-        "cost_vs_budget": row["cost_vs_budget"],
-        "billing_gap_pct": row["billing_gap_pct"],
-        "approved_co_pct": row["approved_co_pct"],
-        "rejected_co_pct": row["rejected_co_pct"],
-        "total_rfis": int(row["total_rfis"]),
-        "labor_burn_ratio": row["labor_burn_ratio"],
-        "labor_avg_pct_overrun": row["labor_avg_pct_overrun"],
-        "material_avg_pct_overrun": row["material_avg_pct_overrun"],
-        "management_cause": row["management_cause"],
-        "evidence": row["evidence"],
-        "recommended_action": row["recommended_action"],
-        "severity": row["severity"],
+        "project_id": _series_value(row, "project_id", project_id),
+        "project_name": _series_value(row, "project_name", project_id),
+        "gc_name": _series_value(row, "gc_name", ""),
+        "risk_level": _series_value(row, "risk_level", "UNKNOWN"),
+        "main_issue": _series_value(row, "main_issue", "Unknown"),
+        "realized_margin_pct": _series_value(row, "realized_margin_pct"),
+        "cost_vs_budget": _series_value(row, "cost_vs_budget"),
+        "billing_gap_pct": _series_value(row, "billing_gap_pct"),
+        "approved_co_pct": _series_value(row, "approved_co_pct"),
+        "rejected_co_pct": _series_value(row, "rejected_co_pct"),
+        "total_rfis": int(_series_value(row, "total_rfis", 0) or 0),
+        "labor_burn_ratio": _series_value(row, "labor_burn_ratio"),
+        "labor_avg_pct_overrun": _series_value(row, "labor_avg_pct_overrun"),
+        "material_avg_pct_overrun": _series_value(row, "material_avg_pct_overrun"),
+        "management_cause": _series_value(row, "management_cause", "Mixed / monitor"),
+        "evidence": _series_value(row, "evidence", "No evidence summary available"),
+        "recommended_action": _series_value(row, "recommended_action", "Review project"),
+        "severity": _series_value(row, "severity", "Moderate"),
     }
 
 
 def get_all_field_notes(project_id: str) -> list[dict]:
     """Get ALL field notes for a project from field_notes_all.csv"""
     df = _load_csv("field_notes_all.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return []
 
-    proj_notes = df[df["project_id"] == project_id].sort_values("date", ascending=False)
+    proj_notes = df[df["project_id"] == project_id]
+    if "date" in proj_notes.columns:
+        proj_notes = proj_notes.sort_values("date", ascending=False)
 
     notes = []
     for _, row in proj_notes.iterrows():
         notes.append({
-            "date": row["date"],
-            "author": row["author"],
-            "note_type": row["note_type"],
-            "content": row["content"],
+            "date": _series_value(row, "date", ""),
+            "author": _series_value(row, "author", ""),
+            "note_type": _series_value(row, "note_type", ""),
+            "content": _series_value(row, "content", ""),
         })
 
     return notes
@@ -99,7 +108,7 @@ def get_all_field_notes(project_id: str) -> list[dict]:
 def get_change_orders(project_id: str) -> list[dict]:
     """Get all change orders for a project"""
     df = _load_csv("change_orders_all.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return []
 
     proj_cos = df[df["project_id"] == project_id]
@@ -107,11 +116,11 @@ def get_change_orders(project_id: str) -> list[dict]:
     cos = []
     for _, row in proj_cos.iterrows():
         cos.append({
-            "co_number": row["co_number"],
-            "description": row["description"],
-            "amount": row["amount"],
-            "status": row["status"],
-            "reason_category": row["reason_category"],
+            "co_number": _series_value(row, "co_number", ""),
+            "description": _series_value(row, "description", ""),
+            "amount": _series_value(row, "amount", 0),
+            "status": _series_value(row, "status", ""),
+            "reason_category": _series_value(row, "reason_category", ""),
         })
 
     return cos
@@ -120,7 +129,7 @@ def get_change_orders(project_id: str) -> list[dict]:
 def get_rfis(project_id: str) -> list[dict]:
     """Get all RFIs for a project"""
     df = _load_csv("rfis_all.csv")
-    if df is None:
+    if df is None or "project_id" not in df.columns:
         return []
 
     proj_rfis = df[df["project_id"] == project_id]
@@ -128,11 +137,11 @@ def get_rfis(project_id: str) -> list[dict]:
     rfis = []
     for _, row in proj_rfis.iterrows():
         rfis.append({
-            "rfi_number": row["rfi_number"],
-            "subject": row["subject"],
-            "status": row["status"],
-            "priority": row.get("priority", ""),
-            "cost_impact": row.get("cost_impact", False),
+            "rfi_number": _series_value(row, "rfi_number", ""),
+            "subject": _series_value(row, "subject", ""),
+            "status": _series_value(row, "status", ""),
+            "priority": _series_value(row, "priority", ""),
+            "cost_impact": _series_value(row, "cost_impact", False),
         })
 
     return rfis

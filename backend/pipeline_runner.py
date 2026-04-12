@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import time
 from pathlib import Path
 from config import PROJECT_ROOT, DATA_DIR, PIPELINE_DIR, sync_hvac_data_link
@@ -39,12 +40,13 @@ STAGES = [
     },
     {
         "id": "3_flag",
-        "label": "Flag & Score",
-        "description": "Identify at-risk projects and compute risk scores",
+        "label": "Flag, Score & Summarize",
+        "description": "Identify at-risk projects, compute risk scores, and build management summaries",
         "scripts": [
             PROJECT_ROOT / "portfolio_scan.py",
             PROJECT_ROOT / "project_flagging.py",
             PROJECT_ROOT / "risk_scorer.py",
+            PROJECT_ROOT / "root_cause_summary.py",
         ],
     },
     {
@@ -102,7 +104,7 @@ def run_pipeline(available_files: list[str] | None = None):
             t0 = time.time()
             try:
                 result = subprocess.run(
-                    ["python", str(script)],
+                    [sys.executable, str(script)],
                     cwd=str(PROJECT_ROOT),
                     capture_output=True,
                     text=True,

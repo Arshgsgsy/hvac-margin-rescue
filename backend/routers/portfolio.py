@@ -10,7 +10,7 @@ from llm_service import (
     analyze_project_hybrid_sync,
     run_portfolio_optimization_sync,
 )
-from prompts import build_project_packet, build_hybrid_project_packet, get_management_summary
+from prompts import build_project_packet, build_hybrid_project_packet
 
 # Add pipeline to path for portfolio optimizer
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "pipeline" / "4_llm"))
@@ -20,13 +20,18 @@ router = APIRouter()
 # Output paths
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output_summaries"
 ANALYSIS_OUTPUT = OUTPUT_DIR / "project_analyses.json"
+ANALYSIS_ERRORS_OUTPUT = OUTPUT_DIR / "analysis_errors.json"
 OPTIMIZATION_OUTPUT = OUTPUT_DIR / "portfolio_optimization.json"
 FLAGGED_PROJECTS = OUTPUT_DIR / "flagged_projects.json"
 
 
 @router.get("/portfolio/summary")
 def get_portfolio_summary():
-    summary = load_portfolio_summary()
+    try:
+        summary = load_portfolio_summary()
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc)) from exc
+
     if not summary:
         raise HTTPException(404, "Portfolio summary not found. Run the pipeline first.")
     return summary
@@ -34,7 +39,11 @@ def get_portfolio_summary():
 
 @router.get("/portfolio/projects")
 def get_portfolio_projects():
-    projects = load_all_projects()
+    try:
+        projects = load_all_projects()
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc)) from exc
+
     if not projects:
         raise HTTPException(404, "No flagged projects found. Run the pipeline first.")
     return projects
@@ -48,26 +57,24 @@ async def analyze_single_project(project_id: str, use_hybrid: bool = True):
     Args:
         project_id: The project ID to analyze
         use_hybrid: If True (default), use hybrid approach with:
-            - Metrics from management_project_summary.csv
+            - Metrics from management_project_summary.csv when available
             - ALL field notes from field_notes_all.csv
             - Full CO/RFI details
     """
     if use_hybrid:
-        # Check if project exists in management summary
-        summary = get_management_summary(project_id)
-        if not summary:
-            raise HTTPException(404, f"Project {project_id} not found in management summary")
-
         try:
             analysis = await analyze_project_hybrid(project_id)
             if analysis is None:
-                raise HTTPException(500, "Failed to build hybrid packet")
+                raise HTTPException(404, f"Project {project_id} not found")
             return analysis
         except Exception as e:
             raise HTTPException(500, f"Hybrid analysis failed: {str(e)}")
     else:
         # Legacy approach
-        project = load_single_project(project_id)
+        try:
+            project = load_single_project(project_id)
+        except RuntimeError as exc:
+            raise HTTPException(500, str(exc)) from exc
         if not project:
             raise HTTPException(404, f"Project {project_id} not found")
 
@@ -89,12 +96,22 @@ def get_project_packet(project_id: str, use_hybrid: bool = True):
     """
     if use_hybrid:
         packet = build_hybrid_project_packet(project_id)
-        if not packet:
-            raise HTTPException(404, f"Project {project_id} not found in management summary")
-        return packet
+        if packet:
+            return packet
+
+        try:
+            project = load_single_project(project_id)
+        except RuntimeError as exc:
+            raise HTTPException(500, str(exc)) from exc
+        if not project:
+            raise HTTPException(404, f"Project {project_id} not found")
+        return build_project_packet(project)
     else:
         # Legacy approach
-        project = load_single_project(project_id)
+        try:
+            project = load_single_project(project_id)
+        except RuntimeError as exc:
+            raise HTTPException(500, str(exc)) from exc
         if not project:
             raise HTTPException(404, f"Project {project_id} not found")
         return build_project_packet(project)
@@ -102,7 +119,7 @@ def get_project_packet(project_id: str, use_hybrid: bool = True):
 
 def _run_batch_analysis_task():
     """Background task to run batch analysis"""
-    from pipeline.run_batch_analysis import run_batch_analysis
+    from run_batch_analysis import run_batch_analysis
     run_batch_analysis()
 
 
@@ -155,19 +172,26 @@ def _run_batch_analysis_internal(projects: list[dict], use_hybrid: bool = True):
     with open(ANALYSIS_OUTPUT, "w") as f:
         json.dump(analyses, f, indent=2)
 
-    # Generate summary
-    if analyses:
-        summary = _generate_portfolio_summary(analyses)
-        with open(OUTPUT_DIR / "portfolio_analysis.json", "w") as f:
-            json.dump(summary, f, indent=2)
+    if errors:
+        with open(ANALYSIS_ERRORS_OUTPUT, "w") as f:
+            json.dump(errors, f, indent=2)
+    elif ANALYSIS_ERRORS_OUTPUT.exists():
+        ANALYSIS_ERRORS_OUTPUT.unlink()
+
+    summary = _generate_portfolio_summary(analyses, errors)
+    with open(OUTPUT_DIR / "portfolio_analysis.json", "w") as f:
+        json.dump(summary, f, indent=2)
 
     return analyses
 
 
-def _generate_portfolio_summary(analyses: list[dict]) -> dict:
+def _generate_portfolio_summary(analyses: list[dict], errors: list[dict] | None = None) -> dict:
     """Aggregate individual analyses into portfolio view"""
+    errors = errors or []
     return {
         "project_count": len(analyses),
+        "error_count": len(errors),
+        "errors": errors,
         "severity_counts": {
             "critical": sum(1 for a in analyses if a.get("severity") == "CRITICAL"),
             "warning": sum(1 for a in analyses if a.get("severity") == "WARNING"),

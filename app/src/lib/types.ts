@@ -74,6 +74,15 @@ export interface RecoveryAction {
   category: string
 }
 
+export interface RecoveryActionRich {
+  priority: number
+  action: string
+  owner: 'Project Manager' | 'Finance' | 'Operations' | 'Executive'
+  financial_logic: string
+  estimated_recovery_dollars: number | null
+  urgency: 'immediate' | 'this_week' | 'this_month' | 'ongoing'
+}
+
 export interface Project {
   [key: string]: any
   id: string
@@ -122,6 +131,9 @@ export interface Project {
   total_recoverable_estimate: number | null
   analysis_confidence: string | null
   headline: string | null
+  forecast_if_no_action?: string
+  forecast_with_action?: string
+  recovery_actions_rich?: RecoveryActionRich[]
 }
 
 export interface PortfolioSummary {
