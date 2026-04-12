@@ -21,13 +21,17 @@ ENV NEXT_PUBLIC_API_URL=/api
 ENV HOSTNAME=0.0.0.0
 ENV BACKEND_PORT=8000
 ENV FASTAPI_ROOT_PATH=/api
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./backend/requirements.txt
-RUN python3 -m pip install --no-cache-dir -r backend/requirements.txt
+RUN python3 -m venv "${VIRTUAL_ENV}" \
+    && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir --upgrade pip \
+    && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r backend/requirements.txt
 
 COPY . .
 
