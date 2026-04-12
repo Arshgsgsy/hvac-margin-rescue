@@ -6,30 +6,30 @@ export function buildProjectContext(project: Project): string {
 
   return `PROJECT: ${project.id} -- ${project.name}
 SECTOR: ${project.sector}
-CONTRACT VALUE: ${usd(project.contractValue)}
+CONTRACT VALUE: ${usd(project.contract_value)}
 
 MARGIN ANALYSIS
-  Bid Margin:      ${pct(project.bidMargin)}
-  Realized Margin: ${pct(project.realizedMargin)}
-  Margin Erosion:  ${pct(Math.abs(project.marginDelta))} below bid
+  Bid Margin:      ${pct(project.bid_margin)}
+  Realized Margin: ${pct(project.realized_margin)}
+  Margin Erosion:  ${pct(Math.abs(project.margin_delta))} below bid
   Severity:        ${project.severity.toUpperCase()}
 
 COST BREAKDOWN
-  Labor    -- Budget: ${usd(project.laborCost.budget)} | Actual: ${usd(project.laborCost.actual)} | Overrun: ${usd(project.laborOverrun)}
-  Material -- Budget: ${usd(project.materialCost.budget)} | Actual: ${usd(project.materialCost.actual)} | Overrun: ${usd(project.materialOverrun)}
+  Labor    -- Budget: ${usd(project.labor_cost.budget)} | Actual: ${usd(project.labor_cost.actual)} | Overrun: ${usd(project.labor_overrun)}
+  Material -- Budget: ${usd(project.material_cost.budget)} | Actual: ${usd(project.material_cost.actual)} | Overrun: ${usd(project.material_overrun)}
 
 BILLING STATUS
-  % Complete: ${pct(project.billingStatus.percentComplete)}
-  % Billed:   ${pct(project.billingStatus.percentBilled)}
-  Billing Gap: ${pct(project.billingGap)} (${usd(project.contractValue * project.billingGap)} unbilled)
+  % Complete: ${pct(project.billing_status.percent_complete)}
+  % Billed:   ${pct(project.billing_status.percent_billed)}
+  Billing Gap: ${pct(project.billing_gap)} (${usd(project.contract_value * project.billing_gap)} unbilled)
 
 FIELD NOTES
-${project.fieldNoteSummary ?? 'None available.'}
+${project.field_note_summary ?? 'None available.'}
 
-CHANGE ORDERS (${project.changeOrders?.length ?? 0})
-${project.changeOrders?.map(co => `  ${co.id} [${co.status.toUpperCase()}] ${usd(co.costIncurred)} -- ${co.description}`).join('\n') ?? '  None'}
+CHANGE ORDERS (${project.change_orders?.length ?? 0})
+${project.change_orders?.map(co => `  ${co.id} [${co.status.toUpperCase()}] ${usd(co.amount)} -- ${co.description}`).join('\n') ?? '  None'}
 
 OPEN RFIs
-${project.rfis?.filter(r => r.status === 'open').map(r => `  ${r.id} -- open ${r.daysOpen}d -- ${r.description}`).join('\n') ?? '  None'}
+${project.rfis?.filter(r => r.status === 'open').map(r => `  ${r.id} -- open ${r.days_open}d -- ${r.description}`).join('\n') ?? '  None'}
 `
 }

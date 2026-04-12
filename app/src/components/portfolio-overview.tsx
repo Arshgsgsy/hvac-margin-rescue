@@ -9,25 +9,25 @@ export default function PortfolioOverview({ summary }: Props) {
   const cards = [
     {
       label: 'Total Portfolio Value',
-      value: formatCurrency(summary.totalValue),
-      sub: `${summary.totalProjects} active projects`,
+      value: formatCurrency(summary.total_value),
+      sub: `${summary.total_projects} active projects`,
       color: '#3b82f6',
     },
     {
       label: 'Avg Realized Margin',
-      value: formatPercent(summary.avgRealizedMargin),
-      sub: `Bid avg: ${formatPercent(summary.avgBidMargin)}`,
-      color: summary.avgRealizedMargin < summary.avgBidMargin - 0.02 ? '#f59e0b' : '#10b981',
+      value: formatPercent(summary.avg_realized_margin),
+      sub: `Bid avg: ${formatPercent(summary.avg_bid_margin)}`,
+      color: summary.avg_realized_margin < summary.avg_bid_margin - 0.02 ? '#f59e0b' : '#10b981',
     },
     {
       label: 'Flagged Projects',
-      value: summary.flaggedCount.toString(),
-      sub: `${summary.criticalCount} critical`,
+      value: summary.flagged_count.toString(),
+      sub: `${summary.critical_count} critical`,
       color: '#ef4444',
     },
     {
       label: 'Total Exposure',
-      value: formatCurrency(summary.totalExposure),
+      value: formatCurrency(summary.total_exposure),
       sub: 'Labor + material overruns',
       color: '#f59e0b',
     },

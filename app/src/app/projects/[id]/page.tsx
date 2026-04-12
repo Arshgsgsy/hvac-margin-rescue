@@ -1,15 +1,45 @@
-import { notFound } from 'next/navigation'
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getProject } from '@/lib/data'
 import ProjectDrilldown from '@/components/project-drilldown'
+import { fetchProject } from '@/lib/api'
+import { Project } from '@/lib/types'
+import { Loader2 } from 'lucide-react'
 
-interface Props {
-  params: { id: string }
-}
+export default function ProjectPage() {
+  const params = useParams()
+  const id = params.id as string
+  const [project, setProject] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-export default function ProjectPage({ params }: Props) {
-  const project = getProject(params.id)
-  if (!project) notFound()
+  useEffect(() => {
+    fetchProject(id)
+      .then(setProject)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0f1e' }}>
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+      </div>
+    )
+  }
+
+  if (error || !project) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0f1e' }}>
+        <div className="text-center">
+          <p className="text-red-400 mb-2">Project not found</p>
+          <Link href="/" className="text-blue-400 text-sm">Back to portfolio</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0f1e' }}>

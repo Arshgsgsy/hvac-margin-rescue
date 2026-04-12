@@ -1,12 +1,5 @@
 export type Severity = 'critical' | 'warning' | 'watch'
 
-export interface RecoveryAction {
-  description: string
-  amount: number
-  priority: 'high' | 'medium' | 'low'
-  category: 'billing' | 'change_order' | 'labor' | 'material' | 'renegotiation'
-}
-
 export interface CostBreakdown {
   budget: number
   actual: number
@@ -26,68 +19,77 @@ export interface LaborWeek {
 
 export interface MaterialDelivery {
   description: string
-  budgetedCost: number
-  actualCost: number
-  condition: 'Good' | 'Damaged' | 'Partial' | 'Reordered'
+  total_cost: number
   date: string
+  condition: string
+  vendor: string
 }
 
-export interface BillingMonth {
-  month: string
-  billed: number
-  actualCost: number
+export interface BillingPeriod {
+  period_end: string
+  period_total: number
+  cumulative_billed: number
+  retention_held: number
+  status: string
 }
 
 export interface RFIWeek {
   week: string
-  rfiCount: number
-  weeklyCost: number
+  rfi_count: number
 }
 
 export interface ChangeOrder {
   id: string
   description: string
-  costIncurred: number
-  billedToClient: boolean
+  amount: number
   status: string
-  marginImpact: number
+  reason_category: string
+}
+
+export interface RFI {
+  id: string
+  status: string
+  days_open: number
+  description: string
+  priority: string
+  cost_impact: boolean
 }
 
 export interface Project {
   id: string
   name: string
   sector: string
-  contractValue: number
-  bidMargin: number
-  realizedMargin: number
-  marginDelta: number
+  contract_value: number
+  bid_margin: number
+  realized_margin: number
+  margin_delta: number
   severity: Severity
-  laborOverrun: number
-  materialOverrun: number
-  billingGap: number
-  laborCost: CostBreakdown
-  materialCost: CostBreakdown
-  billingStatus: { percentComplete: number; percentBilled: number }
-  rootCause?: string
-  recoveryActions?: RecoveryAction[]
-  fieldNoteSummary?: string
-  changeOrders?: ChangeOrder[]
-  rfis?: { id: string; status: string; daysOpen: number; description: string }[]
-  sovLines?: SOVLine[]
-  laborByWeek?: LaborWeek[]
-  materialDeliveries?: MaterialDelivery[]
-  billingHistory?: BillingMonth[]
-  rfiByWeek?: RFIWeek[]
+  labor_overrun: number
+  material_overrun: number
+  billing_gap: number
+  labor_cost: CostBreakdown
+  material_cost: CostBreakdown
+  billing_status: { percent_complete: number; percent_billed: number }
+  root_cause?: string | null
+  recovery_actions?: { description: string; amount: number; priority: string; category: string }[] | null
+  field_note_summary?: string | null
+  change_orders?: ChangeOrder[]
+  rfis?: RFI[]
+  sov_lines?: SOVLine[]
+  labor_by_week?: LaborWeek[]
+  material_deliveries?: MaterialDelivery[]
+  billing_history?: BillingPeriod[]
+  rfi_by_week?: RFIWeek[]
 }
 
 export interface PortfolioSummary {
-  totalProjects: number
-  totalValue: number
-  avgBidMargin: number
-  avgRealizedMargin: number
-  flaggedCount: number
-  criticalCount: number
-  totalExposure: number
+  total_projects: number
+  total_value: number
+  avg_bid_margin: number
+  avg_realized_margin: number
+  flagged_count: number
+  critical_count: number
+  total_exposure: number
 }
 
 export type PipelineStepStatus = 'idle' | 'running' | 'complete' | 'error'
@@ -96,10 +98,15 @@ export interface PipelineStep {
   id: string
   label: string
   description: string
-  script: string
-  logs: string[]
   status: PipelineStepStatus
   duration?: number
+  logs: string[]
+}
+
+export interface PipelineResult {
+  status: string
+  total_duration_seconds: number
+  steps: PipelineStep[]
 }
 
 export interface ChatMessage {
