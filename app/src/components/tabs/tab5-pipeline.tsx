@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { CheckCircle2, Circle, Loader2, Terminal, ChevronRight, Zap } from 'lucide-react'
-import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency } from '@/lib/data'
+import { CheckCircle2, Circle, Loader2, Terminal, ChevronRight, Zap, ArrowRight, AlertTriangle, TrendingDown, Eye } from 'lucide-react'
+import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent, getSortedByPriority } from '@/lib/data'
+import Link from 'next/link'
 
 interface StepDef {
   id: string
@@ -111,7 +112,7 @@ const STEPS: StepDef[] = [
     id: 'agent',
     label: 'LLM Root Cause Analysis',
     script: '05_agent.py + Claude Haiku',
-    description: 'Send each flagged project context to Claude â€” root cause identification + dollar-quantified recovery actions',
+    description: 'Send each flagged project context to Claude â€" root cause identification + dollar-quantified recovery actions',
     duration: 8500,
     logs: [
       'Loading flagged projects from pipeline/output/...',
@@ -151,12 +152,21 @@ const STEPS: StepDef[] = [
 
 type StepStatus = 'idle' | 'running' | 'complete'
 
+const SEVERITY_ICON = { critical: AlertTriangle, warning: TrendingDown, watch: Eye }
+const SEVERITY_COLOR = { critical: 'text-red-400', warning: 'text-yellow-400', watch: 'text-blue-400' }
+const SEVERITY_BADGE = {
+  critical: 'bg-red-500/15 text-red-400 border-red-500/30',
+  warning: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  watch: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+}
+
 export function Tab5Pipeline() {
   const [statuses, setStatuses] = useState<StepStatus[]>(STEPS.map(() => 'idle'))
   const [visibleLogs, setVisibleLogs] = useState<string[][]>(STEPS.map(() => []))
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
+  const top5 = getSortedByPriority(MOCK_PROJECTS).slice(0, 5)
   const logRefs = useRef<(HTMLDivElement | null)[]>([])
   const runningRef = useRef(false)
 
@@ -281,7 +291,7 @@ export function Tab5Pipeline() {
                 opacity: status === 'idle' && running ? 0.45 : 1,
               }}
             >
-              {/* Step header â€” clickable to expand logs */}
+              {/* Step header â€" clickable to expand logs */}
               <button
                 className="w-full flex items-center gap-4 px-5 py-4 text-left"
                 onClick={() => hasLogs && setExpandedStep(isExpanded ? null : i)}
@@ -349,29 +359,99 @@ export function Tab5Pipeline() {
         })}
       </div>
 
-      {/* Results summary â€” shown after completion */}
+      {/* Results summary + top 5 critical projects */}
       {done && (
-        <div className="rounded-2xl border border-emerald-500/30 p-6" style={{ background: 'rgba(16,185,129,0.05)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-foreground font-semibold">Pipeline Complete â€” Results Ready</h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Projects Scanned', value: '405' },
-              { label: 'Flagged', value: `${PORTFOLIO_SUMMARY.flaggedCount}` },
-              { label: 'Critical', value: `${PORTFOLIO_SUMMARY.criticalCount}`, alert: true },
-              { label: 'Recovery Opportunity', value: formatCurrency(PORTFOLIO_SUMMARY.flaggedCount * 280000), alert: true },
-            ].map(s => (
-              <div key={s.label} className="rounded-xl bg-black/20 border border-border/30 px-4 py-3">
-                <p className="text-muted-foreground text-xs mb-1">{s.label}</p>
-                <p className={`text-xl font-bold ${s.alert ? 'text-emerald-400' : 'text-foreground'}`}>{s.value}</p>
+        <div className="space-y-4">
+            {/* KPI bar */}
+            <div className="rounded-2xl border border-emerald-500/30 p-5" style={{ background: 'rgba(16,185,129,0.05)' }}>
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-foreground font-semibold">Pipeline Complete - Results Ready</h3>
               </div>
-            ))}
-          </div>
-          <p className="text-muted-foreground text-xs mt-4">
-            Switch to the <span className="text-foreground font-medium">Executive Portfolio View</span> tab to explore findings, or use <span className="text-foreground font-medium">SOV Variance Drill-Down</span> to investigate individual projects.
-          </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Projects Scanned', value: '405' },
+                  { label: 'Flagged', value: `${PORTFOLIO_SUMMARY.flaggedCount}` },
+                  { label: 'Critical', value: `${PORTFOLIO_SUMMARY.criticalCount}`, alert: true },
+                  { label: 'Recovery Opportunity', value: formatCurrency(PORTFOLIO_SUMMARY.flaggedCount * 280000), alert: true },
+                ].map(s => (
+                  <div key={s.label} className="rounded-xl bg-black/20 border border-border/30 px-4 py-3">
+                    <p className="text-muted-foreground text-xs mb-1">{s.label}</p>
+                    <p className={`text-xl font-bold ${s.alert ? 'text-emerald-400' : 'text-foreground'}`}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top 5 critical projects */}
+            <div className="rounded-2xl border border-border/50 overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
+                <div>
+                  <h3 className="text-foreground font-semibold">Immediate Action Required</h3>
+                  <p className="text-muted-foreground text-xs mt-0.5">Top 5 projects ranked by margin erosion severity - investigate these first</p>
+                </div>
+                <span className="text-xs text-muted-foreground">sorted by priority score</span>
+              </div>
+
+              <div className="divide-y divide-border/30">
+                {top5.map((project, i) => {
+                  const Icon = SEVERITY_ICON[project.severity]
+                  const erosion = Math.abs(project.marginDelta) * 100
+                  const recovery = project.recoveryActions?.reduce((s, a) => s + a.amount, 0) ?? 0
+                  return (
+                    <div key={project.id} className={`flex items-center gap-4 px-5 py-4 hover:bg-muted/10 transition-colors ${project.severity === 'critical' ? 'bg-red-500/5' : ''}`}>
+                      {/* Rank */}
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-muted-foreground">#{i + 1}</span>
+                      </div>
+
+                      {/* Severity icon */}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${project.severity === 'critical' ? 'bg-red-500/10' : project.severity === 'warning' ? 'bg-yellow-500/10' : 'bg-blue-500/10'}`}>
+                        <Icon className={`w-4 h-4 ${SEVERITY_COLOR[project.severity]}`} />
+                      </div>
+
+                      {/* Project info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-foreground text-sm font-semibold truncate">{project.name}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${SEVERITY_BADGE[project.severity]}`}>
+                            {project.severity}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className="text-muted-foreground text-xs">{project.sector}</span>
+                          <span className="text-muted-foreground text-xs">{formatCurrency(project.contractValue)}</span>
+                          <span className="text-red-400 text-xs font-medium">-{erosion.toFixed(1)} pts margin erosion</span>
+                          <span className="text-xs text-muted-foreground">
+                            Bid <span className="text-foreground">{formatPercent(project.bidMargin)}</span>
+                            {' -> '}
+                            Realized <span className="text-red-400">{formatPercent(project.realizedMargin)}</span>
+                          </span>
+                        </div>
+                        {/* Erosion bar */}
+                        <div className="mt-2 h-1 rounded-full bg-muted overflow-hidden w-48">
+                          <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400" style={{ width: `${Math.min(erosion * 5, 100)}%` }} />
+                        </div>
+                      </div>
+
+                      {/* Recovery + action */}
+                      <div className="text-right shrink-0">
+                        {recovery > 0 && (
+                          <p className="text-emerald-400 text-sm font-bold">{formatCurrency(recovery)}</p>
+                        )}
+                        <p className="text-muted-foreground text-xs mb-2">recovery potential</p>
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:gap-2 transition-all"
+                        >
+                          Investigate <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
         </div>
       )}
     </div>
