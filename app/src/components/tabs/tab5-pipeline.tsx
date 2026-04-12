@@ -1,17 +1,38 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { CheckCircle2, Loader2, Terminal, ChevronRight, Zap, Upload } from 'lucide-react'
-import { formatCurrency } from '@/lib/data'
-import { PortfolioSummary, PipelineStep } from '@/lib/types'
+import { useState, useRef, useCallback, useMemo } from 'react'
+import Link from 'next/link'
+import {
+  CheckCircle2,
+  Loader2,
+  Terminal,
+  ChevronRight,
+  Zap,
+  Upload,
+  AlertTriangle,
+  TrendingDown,
+  Eye,
+  ArrowRight,
+} from 'lucide-react'
+import { formatCurrency, formatPercent, getSortedByPriority } from '@/lib/data'
+import { PortfolioSummary, PipelineStep, Project } from '@/lib/types'
 import { uploadFiles, runPipeline } from '@/lib/api'
 
 interface Props {
   portfolio: PortfolioSummary | null
+  projects: Project[]
   onPipelineComplete: () => void
 }
 
-export function Tab5Pipeline({ portfolio, onPipelineComplete }: Props) {
+const SEVERITY_ICON = { critical: AlertTriangle, warning: TrendingDown, watch: Eye }
+const SEVERITY_COLOR = { critical: 'text-red-400', warning: 'text-yellow-400', watch: 'text-blue-400' }
+const SEVERITY_BADGE = {
+  critical: 'bg-red-500/15 text-red-400 border-red-500/30',
+  warning: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  watch: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+}
+
+export function Tab5Pipeline({ portfolio, projects, onPipelineComplete }: Props) {
   const [uploading, setUploading] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size_bytes: number }[]>([])
   const [running, setRunning] = useState(false)
@@ -20,6 +41,8 @@ export function Tab5Pipeline({ portfolio, onPipelineComplete }: Props) {
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const top5 = useMemo(() => getSortedByPriority(projects).slice(0, 5), [projects])
 
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -227,27 +250,95 @@ export function Tab5Pipeline({ portfolio, onPipelineComplete }: Props) {
 
       {/* Results summary */}
       {done && portfolio && (
-        <div className="rounded-2xl border border-emerald-500/30 p-6" style={{ background: 'rgba(16,185,129,0.05)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-foreground font-semibold">Pipeline Complete -- Results Ready</h3>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-emerald-500/30 p-6" style={{ background: 'rgba(16,185,129,0.05)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-foreground font-semibold">Pipeline Complete — Results Ready</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Projects Scanned', value: `${portfolio.total_projects}` },
+                { label: 'Flagged', value: `${portfolio.flagged_count}` },
+                { label: 'Critical', value: `${portfolio.critical_count}`, alert: true },
+                { label: 'Recovery Opportunity', value: formatCurrency(portfolio.flagged_count * 280000), alert: true },
+              ].map(s => (
+                <div key={s.label} className="rounded-xl bg-black/20 border border-border/30 px-4 py-3">
+                  <p className="text-muted-foreground text-xs mb-1">{s.label}</p>
+                  <p className={`text-xl font-bold ${s.alert ? 'text-emerald-400' : 'text-foreground'}`}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs mt-4">
+              Switch to the <span className="text-foreground font-medium">Executive Portfolio View</span> tab to explore findings.
+            </p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Projects Scanned', value: `${portfolio.total_projects}` },
-              { label: 'Flagged', value: `${portfolio.flagged_count}` },
-              { label: 'Critical', value: `${portfolio.critical_count}`, alert: true },
-              { label: 'Recovery Opportunity', value: formatCurrency(portfolio.flagged_count * 280000), alert: true },
-            ].map(s => (
-              <div key={s.label} className="rounded-xl bg-black/20 border border-border/30 px-4 py-3">
-                <p className="text-muted-foreground text-xs mb-1">{s.label}</p>
-                <p className={`text-xl font-bold ${s.alert ? 'text-emerald-400' : 'text-foreground'}`}>{s.value}</p>
+
+          {top5.length > 0 && (
+            <div className="rounded-2xl border border-border/50 overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
+                <div>
+                  <h3 className="text-foreground font-semibold">Immediate Action Required</h3>
+                  <p className="text-muted-foreground text-xs mt-0.5">Top 5 projects ranked by margin erosion severity — investigate these first</p>
+                </div>
+                <span className="text-xs text-muted-foreground">sorted by priority score</span>
               </div>
-            ))}
-          </div>
-          <p className="text-muted-foreground text-xs mt-4">
-            Switch to the <span className="text-foreground font-medium">Executive Portfolio View</span> tab to explore findings.
-          </p>
+
+              <div className="divide-y divide-border/30">
+                {top5.map((project, i) => {
+                  const Icon = SEVERITY_ICON[project.severity]
+                  const erosion = Math.abs(project.margin_delta) * 100
+                  const recovery = project.recovery_actions?.reduce((s, a) => s + a.amount, 0) ?? 0
+                  return (
+                    <div key={project.id} className={`flex items-center gap-4 px-5 py-4 hover:bg-muted/10 transition-colors ${project.severity === 'critical' ? 'bg-red-500/5' : ''}`}>
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-muted-foreground">#{i + 1}</span>
+                      </div>
+
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${project.severity === 'critical' ? 'bg-red-500/10' : project.severity === 'warning' ? 'bg-yellow-500/10' : 'bg-blue-500/10'}`}>
+                        <Icon className={`w-4 h-4 ${SEVERITY_COLOR[project.severity]}`} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-foreground text-sm font-semibold truncate">{project.name}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${SEVERITY_BADGE[project.severity]}`}>
+                            {project.severity}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className="text-muted-foreground text-xs">{project.sector}</span>
+                          <span className="text-muted-foreground text-xs">{formatCurrency(project.contract_value)}</span>
+                          <span className="text-red-400 text-xs font-medium">-{erosion.toFixed(1)} pts margin erosion</span>
+                          <span className="text-xs text-muted-foreground">
+                            Bid <span className="text-foreground">{formatPercent(project.bid_margin)}</span>
+                            {' → '}
+                            Realized <span className="text-red-400">{formatPercent(project.realized_margin)}</span>
+                          </span>
+                        </div>
+                        <div className="mt-2 h-1 rounded-full bg-muted overflow-hidden w-48">
+                          <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400" style={{ width: `${Math.min(erosion * 5, 100)}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        {recovery > 0 && (
+                          <p className="text-emerald-400 text-sm font-bold">{formatCurrency(recovery)}</p>
+                        )}
+                        <p className="text-muted-foreground text-xs mb-2">recovery potential</p>
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:gap-2 transition-all"
+                        >
+                          Investigate <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

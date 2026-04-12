@@ -162,7 +162,9 @@ export default function Home() {
             })()}
           </div>
 
-          {activeTab === 'pipeline' && <Tab5Pipeline portfolio={portfolio} onPipelineComplete={loadData} />}
+          {activeTab === 'pipeline' && (
+            <Tab5Pipeline portfolio={portfolio} projects={projects} onPipelineComplete={loadData} />
+          )}
           {activeTab === 'executive' && (
             loading ? <LoadingState /> : <Tab1Executive projects={projects} portfolio={portfolio} />
           )}
