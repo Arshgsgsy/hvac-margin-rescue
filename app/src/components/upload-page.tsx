@@ -158,7 +158,7 @@ const STEPS: StepDef[] = [
   },
 ]
 
-type StepStatus = 'idle' | 'running' | 'complete'
+type StepStatus = 'idle' | 'running' | 'complete' | 'error'
 
 // Time range options
 const TIME_RANGES = [
@@ -208,12 +208,62 @@ export function UploadPage() {
     }
   }, [done])
 
+  const [pipelineError, setPipelineError] = useState<string | null>(null)
+  const [backendConnected, setBackendConnected] = useState<boolean | null>(null)
+
+  // Check backend connection on mount
+  useEffect(() => {
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => setBackendConnected(data.backend === 'connected'))
+      .catch(() => setBackendConnected(false))
+  }, [])
+
   const runPipeline = async () => {
     if (running || done) return
     setPipelineStarted(true)
     setRunning(true)
     runningRef.current = true
+    setPipelineError(null)
 
+    // Try to call real backend first
+    try {
+      const response = await fetch('/api/pipeline/run', {
+        method: 'POST',
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        
+        // Map backend response to our step format
+        if (result.steps) {
+          for (let i = 0; i < result.steps.length && i < STEPS.length; i++) {
+            const backendStep = result.steps[i]
+            setStatuses((prev) => { 
+              const n = [...prev]
+              n[i] = backendStep.status === 'complete' ? 'complete' : 
+                     backendStep.status === 'error' ? 'error' : 'idle'
+              return n 
+            })
+            setVisibleLogs((prev) => {
+              const n = prev.map((l) => [...l])
+              n[i] = backendStep.logs || []
+              return n
+            })
+          }
+          setRunning(false)
+          setDone(result.status === 'complete')
+          if (result.status === 'error') {
+            setPipelineError('Pipeline execution failed. Check logs for details.')
+          }
+          return
+        }
+      }
+    } catch (error) {
+      console.log('[v0] Backend not available, falling back to simulation')
+    }
+
+    // Fallback to simulation if backend is not available
     for (let i = 0; i < STEPS.length; i++) {
       if (!runningRef.current) break
       const step = STEPS[i]
@@ -240,10 +290,16 @@ export function UploadPage() {
     setDone(true)
   }
 
-  const handleFiles = useCallback((fileList: FileList | null) => {
+  // Store actual File objects for upload
+  const [actualFiles, setActualFiles] = useState<File[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const handleFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return
     
     const newFiles: UploadedFile[] = []
+    const newActualFiles: File[] = []
+    
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i]
       if (file.name.endsWith('.zip') || file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.json')) {
@@ -252,16 +308,44 @@ export function UploadPage() {
           size: file.size,
           type: file.type || 'application/zip'
         })
+        newActualFiles.push(file)
       }
     }
     
     if (newFiles.length > 0) {
       setIsUploading(true)
-      setTimeout(() => {
+      setUploadError(null)
+      
+      try {
+        // Upload each file to the backend
+        for (const file of newActualFiles) {
+          const formData = new FormData()
+          formData.append('file', file)
+          
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          })
+          
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Upload failed')
+          }
+        }
+        
         setFiles(prev => [...prev, ...newFiles])
-        setIsUploading(false)
+        setActualFiles(prev => [...prev, ...newActualFiles])
         setUploadComplete(true)
-      }, 1500)
+      } catch (error) {
+        console.error('[v0] Upload error:', error)
+        setUploadError(error instanceof Error ? error.message : 'Upload failed')
+        // Still show files locally even if backend fails (for demo purposes)
+        setFiles(prev => [...prev, ...newFiles])
+        setActualFiles(prev => [...prev, ...newActualFiles])
+        setUploadComplete(true)
+      } finally {
+        setIsUploading(false)
+      }
     }
   }, [])
 
@@ -295,7 +379,7 @@ export function UploadPage() {
   }
 
   const statusColor = (s: StepStatus) =>
-    s === 'complete' ? '#10b981' : s === 'running' ? '#3b82f6' : '#334155'
+    s === 'complete' ? '#10b981' : s === 'running' ? '#3b82f6' : s === 'error' ? '#ef4444' : '#334155'
 
   const completedCount = statuses.filter((s) => s === 'complete').length
 
@@ -382,6 +466,13 @@ export function UploadPage() {
                 <p className="text-muted-foreground text-lg max-w-xl mx-auto">
                   Upload a ZIP file containing your company&apos;s financial records. Our AI will analyze margins, detect risks, and identify recovery opportunities.
                 </p>
+                {/* Backend connection status */}
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${backendConnected === true ? 'bg-emerald-500' : backendConnected === false ? 'bg-orange-500' : 'bg-muted-foreground animate-pulse'}`} />
+                  <span className="text-xs text-muted-foreground">
+                    {backendConnected === true ? 'Backend connected' : backendConnected === false ? 'Demo mode (backend offline)' : 'Checking connection...'}
+                  </span>
+                </div>
               </div>
 
               {/* Upload zone */}
@@ -439,6 +530,19 @@ export function UploadPage() {
                   </div>
                 )}
               </div>
+
+              {/* Upload/Pipeline errors */}
+              {(uploadError || pipelineError) && (
+                <div className="max-w-3xl mx-auto px-4 py-3 rounded-xl border border-destructive/50 bg-destructive/10 text-destructive">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                    <p className="text-sm">{uploadError || pipelineError}</p>
+                  </div>
+                  <p className="text-xs text-destructive/70 mt-1 ml-7">
+                    Backend may not be running. Using simulation mode for demo.
+                  </p>
+                </div>
+              )}
 
               {/* Uploaded files list */}
               {files.length > 0 && (
