@@ -75,6 +75,9 @@ def _enrich_with_analysis(project: dict, project_id: str):
             # Add root causes from analysis
             if "root_causes" in analysis:
                 project["root_causes"] = analysis["root_causes"]
+                # Also set root_cause as formatted string for frontend compatibility
+                if isinstance(analysis["root_causes"], list) and len(analysis["root_causes"]) > 0:
+                    project["root_cause"] = "; ".join(analysis["root_causes"])
 
             # Add recovery actions from analysis
             if "recovery_actions" in analysis:
@@ -282,3 +285,18 @@ def _enrich_project(project: dict, project_id: str):
                 {"week": row["week"], "rfi_count": int(row["rfi_count"])}
                 for _, row in weekly.iterrows()
             ]
+
+    # Field notes summary
+    field_notes_df = _read_csv(DATA_DIR / "field_notes_all.csv")
+    if field_notes_df is not None:
+        fn_proj = field_notes_df[field_notes_df["project_id"] == project_id]
+        if len(fn_proj) > 0:
+            # Get recent field notes and summarize
+            notes = fn_proj.sort_values("date", ascending=False).head(5)
+            summaries = []
+            for _, row in notes.iterrows():
+                note_text = row.get("notes", row.get("note", ""))
+                if note_text and str(note_text).strip():
+                    summaries.append(str(note_text).strip())
+            if summaries:
+                project["field_note_summary"] = " | ".join(summaries[:3])

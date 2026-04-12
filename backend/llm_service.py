@@ -14,6 +14,7 @@ from prompts import (
     RECOMMENDATION_SYSTEM_PROMPT,
     build_project_context,
     build_project_packet,
+    build_hybrid_project_packet,
     root_cause_prompt,
 )
 from constants import (
@@ -161,6 +162,54 @@ def analyze_project_sync(project: dict) -> dict:
 
     # Agent 2: Recommendations
     full_analysis = run_recommendations_sync(diagnosis, packet)
+
+    return full_analysis
+
+
+def analyze_project_hybrid_sync(project_id: str) -> dict | None:
+    """
+    Full 2-agent analysis using hybrid approach (sync version):
+    - Uses management_project_summary.csv for structured metrics
+    - Includes ALL field notes from field_notes_all.csv
+    - Includes full CO/RFI details
+    """
+    # Build hybrid packet from CSV data
+    packet = build_hybrid_project_packet(project_id)
+    if packet is None:
+        return None
+
+    # Agent 1: Diagnosis (with ALL field notes)
+    diagnosis = run_diagnosis_sync(packet)
+
+    # Agent 2: Recommendations
+    full_analysis = run_recommendations_sync(diagnosis, packet)
+
+    # Include project_id in result
+    full_analysis["project_id"] = project_id
+
+    return full_analysis
+
+
+async def analyze_project_hybrid(project_id: str) -> dict | None:
+    """
+    Full 2-agent analysis using hybrid approach (async version):
+    - Uses management_project_summary.csv for structured metrics
+    - Includes ALL field notes from field_notes_all.csv
+    - Includes full CO/RFI details
+    """
+    # Build hybrid packet from CSV data
+    packet = build_hybrid_project_packet(project_id)
+    if packet is None:
+        return None
+
+    # Agent 1: Diagnosis (with ALL field notes)
+    diagnosis = await run_diagnosis(packet)
+
+    # Agent 2: Recommendations
+    full_analysis = await run_recommendations(diagnosis, packet)
+
+    # Include project_id in result
+    full_analysis["project_id"] = project_id
 
     return full_analysis
 

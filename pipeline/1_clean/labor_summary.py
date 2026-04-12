@@ -6,7 +6,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from constants import OVERTIME_MULTIPLIER
-INPUT_FILE = ROOT / "hvac_data" / "labor_logs_all.csv"
+
+# Read from cleaned data directory (output of 01_clean.py)
+INPUT_FILE = ROOT / "data_cleaned" / "labor_logs_clean.csv"
 OUTPUT_DIR = ROOT / "output_summaries"
 OUTPUT_DIR.mkdir(exist_ok=True)
 

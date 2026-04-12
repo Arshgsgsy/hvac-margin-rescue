@@ -257,12 +257,20 @@ export function Tab5Pipeline({ portfolio, projects, onPipelineComplete }: Props)
               <h3 className="text-foreground font-semibold">Pipeline Complete — Results Ready</h3>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Projects Scanned', value: `${portfolio.total_projects}` },
-                { label: 'Flagged', value: `${portfolio.flagged_count}` },
-                { label: 'Critical', value: `${portfolio.critical_count}`, alert: true },
-                { label: 'Recovery Opportunity', value: formatCurrency(portfolio.flagged_count * 280000), alert: true },
-              ].map(s => (
+              {(() => {
+                // Calculate actual recovery opportunity from project data
+                const totalRecovery = projects.reduce((sum, p) => {
+                  const projectRecovery = p.total_recoverable_estimate ??
+                    (p.recovery_actions?.reduce((s, a) => s + a.amount, 0) ?? 0)
+                  return sum + projectRecovery
+                }, 0)
+                return [
+                  { label: 'Projects Scanned', value: `${portfolio.total_projects}` },
+                  { label: 'Flagged', value: `${portfolio.flagged_count}` },
+                  { label: 'Critical', value: `${portfolio.critical_count}`, alert: true },
+                  { label: 'Recovery Opportunity', value: formatCurrency(totalRecovery > 0 ? totalRecovery : portfolio.total_exposure * 0.3), alert: true },
+                ]
+              })().map(s => (
                 <div key={s.label} className="rounded-xl bg-black/20 border border-border/30 px-4 py-3">
                   <p className="text-muted-foreground text-xs mb-1">{s.label}</p>
                   <p className={`text-xl font-bold ${s.alert ? 'text-emerald-400' : 'text-foreground'}`}>{s.value}</p>

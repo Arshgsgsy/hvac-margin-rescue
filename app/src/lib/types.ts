@@ -71,6 +71,7 @@ export interface Project {
   material_cost: CostBreakdown
   billing_status: { percent_complete: number; percent_billed: number }
   root_cause?: string | null
+  root_causes?: string[] | null
   recovery_actions?: { description: string; amount: number; priority: string; category: string }[] | null
   field_note_summary?: string | null
   change_orders?: ChangeOrder[]
@@ -80,6 +81,9 @@ export interface Project {
   material_deliveries?: MaterialDelivery[]
   billing_history?: BillingPeriod[]
   rfi_by_week?: RFIWeek[]
+  total_recoverable_estimate?: number | null
+  analysis_confidence?: string | null
+  headline?: string | null
 }
 
 export interface PortfolioSummary {
@@ -90,6 +94,7 @@ export interface PortfolioSummary {
   flagged_count: number
   critical_count: number
   total_exposure: number
+  total_recoverable?: number
 }
 
 export type PipelineStepStatus = 'idle' | 'running' | 'complete' | 'error'

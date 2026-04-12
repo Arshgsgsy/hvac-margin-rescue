@@ -3,8 +3,14 @@ import sys
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from data_transformer import load_portfolio_summary, load_all_projects, load_single_project
-from llm_service import analyze_project, analyze_project_sync, run_portfolio_optimization_sync
-from prompts import build_project_packet
+from llm_service import (
+    analyze_project,
+    analyze_project_sync,
+    analyze_project_hybrid,
+    analyze_project_hybrid_sync,
+    run_portfolio_optimization_sync,
+)
+from prompts import build_project_packet, build_hybrid_project_packet, get_management_summary
 
 # Add pipeline to path for portfolio optimizer
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "pipeline" / "4_llm"))
@@ -35,28 +41,63 @@ def get_portfolio_projects():
 
 
 @router.post("/analyze/{project_id}")
-async def analyze_single_project(project_id: str):
-    """Run 2-agent analysis on a single project"""
-    project = load_single_project(project_id)
-    if not project:
-        raise HTTPException(404, f"Project {project_id} not found")
+async def analyze_single_project(project_id: str, use_hybrid: bool = True):
+    """
+    Run 2-agent analysis on a single project.
 
-    try:
-        analysis = await analyze_project(project)
-        return analysis
-    except Exception as e:
-        raise HTTPException(500, f"Analysis failed: {str(e)}")
+    Args:
+        project_id: The project ID to analyze
+        use_hybrid: If True (default), use hybrid approach with:
+            - Metrics from management_project_summary.csv
+            - ALL field notes from field_notes_all.csv
+            - Full CO/RFI details
+    """
+    if use_hybrid:
+        # Check if project exists in management summary
+        summary = get_management_summary(project_id)
+        if not summary:
+            raise HTTPException(404, f"Project {project_id} not found in management summary")
+
+        try:
+            analysis = await analyze_project_hybrid(project_id)
+            if analysis is None:
+                raise HTTPException(500, "Failed to build hybrid packet")
+            return analysis
+        except Exception as e:
+            raise HTTPException(500, f"Hybrid analysis failed: {str(e)}")
+    else:
+        # Legacy approach
+        project = load_single_project(project_id)
+        if not project:
+            raise HTTPException(404, f"Project {project_id} not found")
+
+        try:
+            analysis = await analyze_project(project)
+            return analysis
+        except Exception as e:
+            raise HTTPException(500, f"Analysis failed: {str(e)}")
 
 
 @router.get("/analyze/{project_id}/packet")
-def get_project_packet(project_id: str):
-    """Get the project packet that would be sent to the LLM agents"""
-    project = load_single_project(project_id)
-    if not project:
-        raise HTTPException(404, f"Project {project_id} not found")
+def get_project_packet(project_id: str, use_hybrid: bool = True):
+    """
+    Get the project packet that would be sent to the LLM agents.
 
-    packet = build_project_packet(project)
-    return packet
+    Args:
+        project_id: The project ID
+        use_hybrid: If True (default), return hybrid packet with ALL field notes
+    """
+    if use_hybrid:
+        packet = build_hybrid_project_packet(project_id)
+        if not packet:
+            raise HTTPException(404, f"Project {project_id} not found in management summary")
+        return packet
+    else:
+        # Legacy approach
+        project = load_single_project(project_id)
+        if not project:
+            raise HTTPException(404, f"Project {project_id} not found")
+        return build_project_packet(project)
 
 
 def _run_batch_analysis_task():
@@ -82,15 +123,29 @@ async def analyze_batch(background_tasks: BackgroundTasks):
     }
 
 
-def _run_batch_analysis_internal(projects: list[dict]):
-    """Internal function to run batch analysis"""
+def _run_batch_analysis_internal(projects: list[dict], use_hybrid: bool = True):
+    """
+    Internal function to run batch analysis.
+
+    Args:
+        projects: List of project dicts
+        use_hybrid: If True (default), use hybrid approach with ALL field notes
+    """
     analyses = []
     errors = []
 
     for project in projects:
         project_id = project.get("id", "unknown")
         try:
-            analysis = analyze_project_sync(project)
+            if use_hybrid:
+                # Hybrid approach: uses CSV metrics + ALL field notes
+                analysis = analyze_project_hybrid_sync(project_id)
+                if analysis is None:
+                    errors.append({"project_id": project_id, "error": "Not found in management summary"})
+                    continue
+            else:
+                # Legacy approach
+                analysis = analyze_project_sync(project)
             analyses.append(analysis)
         except Exception as e:
             errors.append({"project_id": project_id, "error": str(e)})

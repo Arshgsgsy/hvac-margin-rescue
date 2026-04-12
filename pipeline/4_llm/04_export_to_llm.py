@@ -45,22 +45,31 @@ from constants import (
     TOP_FIELD_NOTES_LIMIT,
 )
 DEFAULT_HVAC_DIR = ROOT / "hvac_data"
+DEFAULT_CLEANED_DIR = ROOT / "data_cleaned"
 DEFAULT_FLAGGED_FILE = ROOT / "pipeline" / "output" / "flagged_projects.json"
 DEFAULT_OUTPUT_DIR = ROOT / "pipeline" / "output" / "project_packets"
 DEFAULT_MANIFEST = ROOT / "pipeline" / "output" / "project_packet_manifest.json"
 
-KNOWN_TABLE_FILES = {
+# Tables that use cleaned data (from data_cleaned/)
+CLEANED_TABLE_FILES = {
+    "labor_logs": "labor_logs_clean.csv",
+    "material_deliveries": "material_deliveries_clean.csv",
+    "change_orders": "change_orders_clean.csv",
+    "rfis": "rfis_clean.csv",
+}
+
+# Tables that use raw data (from hvac_data/)
+RAW_TABLE_FILES = {
     "contracts": "contracts_all.csv",
     "billing_history": "billing_history_all.csv",
     "billing_line_items": "billing_line_items_all.csv",
-    "change_orders": "change_orders_all.csv",
     "field_notes": "field_notes_all.csv",
-    "labor_logs": "labor_logs_all.csv",
-    "material_deliveries": "material_deliveries_all.csv",
-    "rfis": "rfis_all.csv",
     "sov": "sov_all.csv",
     "sov_budget": "sov_budget_all.csv",
 }
+
+# Combined for backward compatibility
+KNOWN_TABLE_FILES = {**RAW_TABLE_FILES, **{k: v for k, v in CLEANED_TABLE_FILES.items()}}
 
 FIELD_MAPPINGS = {
     "project_id": "contracts.project_id",
@@ -260,7 +269,29 @@ def build_from_hvac_csv(input_dir: Path, project_ids: list[str]) -> list[PacketB
     selected = set(project_ids)
     tables_by_project: dict[str, dict[str, list[dict[str, str]]]] = defaultdict(lambda: defaultdict(list))
 
-    for table_name, filename in KNOWN_TABLE_FILES.items():
+    # Read cleaned data tables from data_cleaned/
+    for table_name, filename in CLEANED_TABLE_FILES.items():
+        path = DEFAULT_CLEANED_DIR / filename
+        if not path.exists():
+            # Fallback to raw data if cleaned not available
+            raw_fallback = {
+                "labor_logs": "labor_logs_all.csv",
+                "material_deliveries": "material_deliveries_all.csv",
+                "change_orders": "change_orders_all.csv",
+                "rfis": "rfis_all.csv",
+            }
+            path = input_dir / raw_fallback.get(table_name, filename)
+        if not path.exists():
+            continue
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                project_id = row.get("project_id")
+                if project_id in selected:
+                    tables_by_project[project_id][table_name].append(row)
+
+    # Read raw data tables from hvac_data/
+    for table_name, filename in RAW_TABLE_FILES.items():
         path = input_dir / filename
         if not path.exists():
             continue

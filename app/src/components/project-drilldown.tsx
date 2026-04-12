@@ -133,10 +133,27 @@ export default function ProjectDrilldown({ project }: Props) {
         {/* Root Cause */}
         <div className="rounded-lg border p-5" style={{ background: '#111827', borderColor: '#1e3a5f' }}>
           <h2 className="text-white font-semibold mb-4">Root Cause Analysis</h2>
-          {project.root_cause ? (
+          {project.headline && (
+            <p className="text-sm font-medium mb-3" style={{ color: '#f59e0b' }}>{project.headline}</p>
+          )}
+          {project.root_causes && project.root_causes.length > 0 ? (
+            <ul className="space-y-2">
+              {project.root_causes.map((cause, i) => (
+                <li key={i} className="text-sm leading-relaxed flex items-start gap-2" style={{ color: '#94a3b8' }}>
+                  <span style={{ color: '#f87171' }}>•</span>
+                  {cause}
+                </li>
+              ))}
+            </ul>
+          ) : project.root_cause ? (
             <p className="text-sm leading-relaxed" style={{ color: '#94a3b8' }}>{project.root_cause}</p>
           ) : (
             <p className="text-sm" style={{ color: '#475569' }}>Ask the agent below for analysis.</p>
+          )}
+          {project.analysis_confidence && (
+            <p className="text-xs mt-3" style={{ color: '#64748b' }}>
+              Confidence: <span style={{ color: '#60a5fa' }}>{project.analysis_confidence}</span>
+            </p>
           )}
           {project.field_note_summary && (
             <div className="mt-4 p-3 rounded border-l-2" style={{ background: '#1a2235', borderColor: '#3b82f6' }}>

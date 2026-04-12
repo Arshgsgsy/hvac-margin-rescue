@@ -4,7 +4,7 @@ Batch Analysis Runner
 Processes all flagged projects through the 2-agent system:
 1. Load flagged projects from pipeline output
 2. For each project:
-   a. Build project packet
+   a. Build project packet (hybrid mode: uses management_project_summary.csv + ALL field notes)
    b. Call Diagnosis Agent
    c. Validate diagnosis output
    d. Call Recommendation Agent with diagnosis + packet
@@ -20,9 +20,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from constants import (
     RETENTION_RATE,
@@ -45,7 +48,16 @@ try:
     import jsonschema
 except ImportError:
     jsonschema = None
+
+# Import hybrid packet builder from backend
+try:
+    from prompts import build_hybrid_project_packet, get_all_field_notes, get_management_summary
+    HYBRID_AVAILABLE = True
+except ImportError:
+    HYBRID_AVAILABLE = False
+
 OUTPUT_DIR = PROJECT_ROOT / "output_summaries"
+DATA_DIR = PROJECT_ROOT / "data"
 FLAGGED_PROJECTS = OUTPUT_DIR / "flagged_projects.json"
 ANALYSIS_OUTPUT = OUTPUT_DIR / "project_analyses.json"
 PORTFOLIO_OUTPUT = OUTPUT_DIR / "portfolio_analysis.json"
@@ -195,6 +207,127 @@ def _determine_recovery_paths(project: dict, pct_billed: float, billing_gap: flo
     if pct_billed < STAGE_LATE_THRESHOLD:
         paths.append("operational_efficiency")
     return paths
+
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# HYBRID PACKET BUILDING (uses management_project_summary.csv + ALL field notes)
+# ─────────────────────────────────────────────────────────────────────────────────
+
+# CSV cache
+_csv_cache = {}
+
+
+def _load_csv(filename: str, directory: Path = None) -> pd.DataFrame | None:
+    """Load CSV with caching"""
+    if filename not in _csv_cache:
+        for dir_path in [OUTPUT_DIR, DATA_DIR] if directory is None else [directory]:
+            path = dir_path / filename
+            if path.exists():
+                _csv_cache[filename] = pd.read_csv(path, low_memory=False)
+                break
+        else:
+            _csv_cache[filename] = None
+    return _csv_cache[filename]
+
+
+def build_hybrid_packet_local(project_id: str) -> dict | None:
+    """
+    Build hybrid packet locally (fallback if backend import fails):
+    - Metrics from management_project_summary.csv
+    - ALL field notes from field_notes_all.csv
+    - Full CO/RFI details from respective CSVs
+    """
+    # Load management summary
+    summary_df = _load_csv("management_project_summary.csv")
+    if summary_df is None:
+        return None
+
+    row = summary_df[summary_df["project_id"] == project_id]
+    if len(row) == 0:
+        return None
+    row = row.iloc[0]
+
+    # Load ALL field notes
+    field_notes_df = _load_csv("field_notes_all.csv")
+    field_notes = []
+    if field_notes_df is not None:
+        proj_notes = field_notes_df[field_notes_df["project_id"] == project_id].sort_values("date", ascending=False)
+        for _, note_row in proj_notes.iterrows():
+            field_notes.append({
+                "date": note_row["date"],
+                "author": note_row["author"],
+                "note_type": note_row["note_type"],
+                "content": note_row["content"],
+            })
+
+    # Load change orders
+    co_df = _load_csv("change_orders_all.csv")
+    change_orders = []
+    if co_df is not None:
+        proj_cos = co_df[co_df["project_id"] == project_id]
+        for _, co_row in proj_cos.iterrows():
+            change_orders.append({
+                "co_number": co_row["co_number"],
+                "description": co_row["description"],
+                "amount": co_row["amount"],
+                "status": co_row["status"],
+                "reason_category": co_row["reason_category"],
+            })
+
+    # Load RFIs
+    rfi_df = _load_csv("rfis_all.csv")
+    rfis = []
+    if rfi_df is not None:
+        proj_rfis = rfi_df[rfi_df["project_id"] == project_id]
+        for _, rfi_row in proj_rfis.iterrows():
+            rfis.append({
+                "rfi_number": rfi_row["rfi_number"],
+                "subject": rfi_row["subject"],
+                "status": rfi_row["status"],
+            })
+
+    # Build hybrid packet
+    return {
+        "project": {
+            "project_id": row["project_id"],
+            "project_name": row["project_name"],
+            "gc_name": row["gc_name"],
+            "risk_level": row["risk_level"],
+            "severity": row["severity"],
+        },
+        "pre_computed_metrics": {
+            "main_issue": row["main_issue"],
+            "management_cause": row["management_cause"],
+            "evidence": row["evidence"],
+            "recommended_action": row["recommended_action"],
+            "realized_margin_pct": row["realized_margin_pct"],
+            "cost_vs_budget": row["cost_vs_budget"],
+            "billing_gap_pct": row["billing_gap_pct"],
+            "labor_burn_ratio": row["labor_burn_ratio"],
+            "labor_avg_pct_overrun": row["labor_avg_pct_overrun"],
+            "material_avg_pct_overrun": row["material_avg_pct_overrun"],
+        },
+        "change_orders": {
+            "approved_co_pct": row["approved_co_pct"],
+            "rejected_co_pct": row["rejected_co_pct"],
+            "details": change_orders,
+        },
+        "rfis": {
+            "total_count": int(row["total_rfis"]),
+            "details": rfis,
+        },
+        "field_notes": {
+            "total_count": len(field_notes),
+            "notes": field_notes,  # ALL field notes included
+        },
+    }
+
+
+def get_hybrid_packet(project_id: str) -> dict | None:
+    """Get hybrid packet, using backend import or local fallback"""
+    if HYBRID_AVAILABLE:
+        return build_hybrid_project_packet(project_id)
+    return build_hybrid_packet_local(project_id)
 
 
 def extract_json_from_response(text: str) -> dict:
@@ -347,12 +480,26 @@ def generate_portfolio_summary(analyses: list[dict]) -> dict:
     return summary
 
 
-def run_batch_analysis(dry_run: bool = False) -> list[dict]:
-    """Main batch processing loop"""
+def run_batch_analysis(dry_run: bool = False, use_hybrid: bool = True) -> list[dict]:
+    """
+    Main batch processing loop.
+
+    Args:
+        dry_run: If True, skip LLM calls
+        use_hybrid: If True (default), use hybrid approach with:
+            - Metrics from management_project_summary.csv
+            - ALL field notes from field_notes_all.csv
+            - Full CO/RFI details
+    """
     projects = load_flagged_projects()
     if not projects:
         print("No flagged projects found")
         return []
+
+    if use_hybrid:
+        print(f"Using HYBRID mode: management_project_summary.csv + ALL field notes")
+    else:
+        print(f"Using LEGACY mode: limited field notes")
 
     analyses = []
     errors = []
@@ -362,13 +509,27 @@ def run_batch_analysis(dry_run: bool = False) -> list[dict]:
         print(f"[{i+1}/{len(projects)}] Analyzing {project_id}...")
 
         try:
-            # Build packet
-            packet = build_project_packet(project)
+            # Build packet (hybrid or legacy)
+            if use_hybrid:
+                packet = get_hybrid_packet(project_id)
+                if packet is None:
+                    print(f"  Warning: Project not found in management summary, using legacy")
+                    packet = build_project_packet(project)
+                else:
+                    field_count = packet.get("field_notes", {}).get("total_count", 0)
+                    print(f"  Hybrid packet: {field_count} field notes loaded")
+            else:
+                packet = build_project_packet(project)
 
             if dry_run:
-                print(f"  [DRY RUN] Would analyze project packet:")
-                print(f"    Contract: ${packet['financials']['contract_value']:,.0f}")
-                print(f"    Stage: {packet['project']['project_stage']}")
+                if use_hybrid and "pre_computed_metrics" in packet:
+                    print(f"  [DRY RUN] Would analyze hybrid packet:")
+                    print(f"    Risk Level: {packet['project']['risk_level']}")
+                    print(f"    Field Notes: {packet['field_notes']['total_count']}")
+                else:
+                    print(f"  [DRY RUN] Would analyze legacy packet:")
+                    print(f"    Contract: ${packet['financials']['contract_value']:,.0f}")
+                    print(f"    Stage: {packet['project']['project_stage']}")
                 continue
 
             # Agent 1: Diagnosis
@@ -388,6 +549,9 @@ def run_batch_analysis(dry_run: bool = False) -> list[dict]:
             valid, errs = validate_against_schema(full_analysis, ANALYSIS_SCHEMA_PATH)
             if not valid:
                 print(f"  Warning: Analysis validation errors: {errs}")
+
+            # Add project_id to analysis
+            full_analysis["project_id"] = project_id
 
             analyses.append(full_analysis)
             print(f"  Completed: {full_analysis.get('severity', 'UNKNOWN')} - {full_analysis.get('headline', 'No headline')[:60]}")
@@ -420,7 +584,7 @@ def run_batch_analysis(dry_run: bool = False) -> list[dict]:
     return analyses
 
 
-def run_full_pipeline(dry_run: bool = False, skip_optimization: bool = False) -> tuple[list[dict], dict | None]:
+def run_full_pipeline(dry_run: bool = False, skip_optimization: bool = False, use_hybrid: bool = True) -> tuple[list[dict], dict | None]:
     """
     Run complete 3-agent pipeline:
     1. Diagnosis Agent (per project)
@@ -430,12 +594,13 @@ def run_full_pipeline(dry_run: bool = False, skip_optimization: bool = False) ->
     Args:
         dry_run: If True, skip LLM calls
         skip_optimization: If True, skip portfolio optimization step
+        use_hybrid: If True (default), use hybrid approach with ALL field notes
 
     Returns:
         Tuple of (analyses, optimization)
     """
     # Stage 1 & 2: Per-project analysis
-    analyses = run_batch_analysis(dry_run=dry_run)
+    analyses = run_batch_analysis(dry_run=dry_run, use_hybrid=use_hybrid)
 
     if dry_run or not analyses or skip_optimization:
         return analyses, None
@@ -459,10 +624,13 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Show what would be analyzed without calling LLM")
     parser.add_argument("--skip-optimization", action="store_true", help="Skip portfolio optimization step")
     parser.add_argument("--optimization-only", action="store_true", help="Run only portfolio optimization on existing analyses")
+    parser.add_argument("--legacy", action="store_true", help="Use legacy mode (limited field notes) instead of hybrid")
     args = parser.parse_args()
+
+    use_hybrid = not args.legacy
 
     if args.optimization_only:
         from portfolio_optimizer import run_full_pipeline_with_optimization
         run_full_pipeline_with_optimization(dry_run=args.dry_run)
     else:
-        run_full_pipeline(dry_run=args.dry_run, skip_optimization=args.skip_optimization)
+        run_full_pipeline(dry_run=args.dry_run, skip_optimization=args.skip_optimization, use_hybrid=use_hybrid)

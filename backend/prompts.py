@@ -1,4 +1,5 @@
 import sys
+import pandas as pd
 from pathlib import Path
 
 # Add project root to path for constants import
@@ -13,6 +14,184 @@ from constants import (
     BILLING_COMPLETE_THRESHOLD,
     BILLING_GAP_RECOVERY_THRESHOLD,
 )
+from config import DATA_DIR, OUTPUT_DIR
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# CSV DATA LOADING FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────────────
+
+# Cache for loaded CSVs
+_csv_cache = {}
+
+
+def _load_csv(filename: str) -> pd.DataFrame | None:
+    """Load a CSV file with caching"""
+    if filename not in _csv_cache:
+        # Check both OUTPUT_DIR and DATA_DIR
+        for directory in [OUTPUT_DIR, DATA_DIR]:
+            path = directory / filename
+            if path.exists():
+                _csv_cache[filename] = pd.read_csv(path)
+                break
+        else:
+            _csv_cache[filename] = None
+    return _csv_cache[filename]
+
+
+def get_management_summary(project_id: str) -> dict | None:
+    """Get pre-computed metrics from management_project_summary.csv"""
+    df = _load_csv("management_project_summary.csv")
+    if df is None:
+        return None
+
+    row = df[df["project_id"] == project_id]
+    if len(row) == 0:
+        return None
+
+    row = row.iloc[0]
+    return {
+        "project_id": row["project_id"],
+        "project_name": row["project_name"],
+        "gc_name": row["gc_name"],
+        "risk_level": row["risk_level"],
+        "main_issue": row["main_issue"],
+        "realized_margin_pct": row["realized_margin_pct"],
+        "cost_vs_budget": row["cost_vs_budget"],
+        "billing_gap_pct": row["billing_gap_pct"],
+        "approved_co_pct": row["approved_co_pct"],
+        "rejected_co_pct": row["rejected_co_pct"],
+        "total_rfis": int(row["total_rfis"]),
+        "labor_burn_ratio": row["labor_burn_ratio"],
+        "labor_avg_pct_overrun": row["labor_avg_pct_overrun"],
+        "material_avg_pct_overrun": row["material_avg_pct_overrun"],
+        "management_cause": row["management_cause"],
+        "evidence": row["evidence"],
+        "recommended_action": row["recommended_action"],
+        "severity": row["severity"],
+    }
+
+
+def get_all_field_notes(project_id: str) -> list[dict]:
+    """Get ALL field notes for a project from field_notes_all.csv"""
+    df = _load_csv("field_notes_all.csv")
+    if df is None:
+        return []
+
+    proj_notes = df[df["project_id"] == project_id].sort_values("date", ascending=False)
+
+    notes = []
+    for _, row in proj_notes.iterrows():
+        notes.append({
+            "date": row["date"],
+            "author": row["author"],
+            "note_type": row["note_type"],
+            "content": row["content"],
+        })
+
+    return notes
+
+
+def get_change_orders(project_id: str) -> list[dict]:
+    """Get all change orders for a project"""
+    df = _load_csv("change_orders_all.csv")
+    if df is None:
+        return []
+
+    proj_cos = df[df["project_id"] == project_id]
+
+    cos = []
+    for _, row in proj_cos.iterrows():
+        cos.append({
+            "co_number": row["co_number"],
+            "description": row["description"],
+            "amount": row["amount"],
+            "status": row["status"],
+            "reason_category": row["reason_category"],
+        })
+
+    return cos
+
+
+def get_rfis(project_id: str) -> list[dict]:
+    """Get all RFIs for a project"""
+    df = _load_csv("rfis_all.csv")
+    if df is None:
+        return []
+
+    proj_rfis = df[df["project_id"] == project_id]
+
+    rfis = []
+    for _, row in proj_rfis.iterrows():
+        rfis.append({
+            "rfi_number": row["rfi_number"],
+            "subject": row["subject"],
+            "status": row["status"],
+            "priority": row.get("priority", ""),
+            "cost_impact": row.get("cost_impact", False),
+        })
+
+    return rfis
+
+
+def build_hybrid_project_packet(project_id: str) -> dict | None:
+    """
+    Build a project packet using the hybrid approach:
+    1. Structured metrics from management_project_summary.csv
+    2. ALL field notes from field_notes_all.csv
+    3. Full CO/RFI details from respective CSVs
+    """
+    # Get pre-computed metrics from management summary
+    summary = get_management_summary(project_id)
+    if summary is None:
+        return None
+
+    # Get ALL field notes
+    field_notes = get_all_field_notes(project_id)
+
+    # Get change orders and RFIs for detail
+    change_orders = get_change_orders(project_id)
+    rfis = get_rfis(project_id)
+
+    # Build the hybrid packet
+    return {
+        "project": {
+            "project_id": summary["project_id"],
+            "project_name": summary["project_name"],
+            "gc_name": summary["gc_name"],
+            "risk_level": summary["risk_level"],
+            "severity": summary["severity"],
+        },
+        "pre_computed_metrics": {
+            "main_issue": summary["main_issue"],
+            "management_cause": summary["management_cause"],
+            "evidence": summary["evidence"],
+            "recommended_action": summary["recommended_action"],
+            "realized_margin_pct": summary["realized_margin_pct"],
+            "cost_vs_budget": summary["cost_vs_budget"],
+            "billing_gap_pct": summary["billing_gap_pct"],
+            "labor_burn_ratio": summary["labor_burn_ratio"],
+            "labor_avg_pct_overrun": summary["labor_avg_pct_overrun"],
+            "material_avg_pct_overrun": summary["material_avg_pct_overrun"],
+        },
+        "change_orders": {
+            "approved_co_pct": summary["approved_co_pct"],
+            "rejected_co_pct": summary["rejected_co_pct"],
+            "details": change_orders,
+        },
+        "rfis": {
+            "total_count": summary["total_rfis"],
+            "details": rfis,
+        },
+        "field_notes": {
+            "total_count": len(field_notes),
+            "notes": field_notes,  # ALL field notes included
+        },
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# PROMPT LOADING
+# ─────────────────────────────────────────────────────────────────────────────────
 
 # Prompt directory
 PROMPT_DIR = Path(__file__).parent.parent / "pipeline" / "4_llm"

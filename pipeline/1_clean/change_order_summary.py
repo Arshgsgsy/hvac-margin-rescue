@@ -2,7 +2,9 @@ import duckdb
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CHANGE_FILE = ROOT / "hvac_data" / "change_orders_all.csv"
+
+# Read from cleaned data directory (output of 01_clean.py)
+CHANGE_FILE = ROOT / "data_cleaned" / "change_orders_clean.csv"
 OUTPUT_FILE = ROOT / "output_summaries" / "change_summary.csv"
 
 con = duckdb.connect()

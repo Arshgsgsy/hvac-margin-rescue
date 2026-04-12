@@ -8,8 +8,9 @@ STAGES = [
     {
         "id": "1_clean",
         "label": "Clean & Summarize",
-        "description": "Normalize labor roles, generate project-level summaries",
+        "description": "Clean raw data, normalize roles/categories, generate project-level summaries",
         "scripts": [
+            PIPELINE_DIR / "1_clean" / "01_clean.py",
             PIPELINE_DIR / "1_clean" / "labor_summary.py",
             PIPELINE_DIR / "1_clean" / "material_summary.py",
             PIPELINE_DIR / "1_clean" / "change_order_summary.py",

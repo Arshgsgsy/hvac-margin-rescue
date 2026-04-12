@@ -1,4 +1,5 @@
 data/
+data_cleaned/
 app/.env.local
 .env
 node_modules/
@@ -26,6 +27,8 @@ app/SQCNW7npB6s.zip
 app/vercel_ref/
 
 # output summaries (generated data)
+output_summaries/
+pipeline/output/
 
 
 # LLM pipeline local reference material / caches

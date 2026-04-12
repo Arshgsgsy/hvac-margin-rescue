@@ -65,11 +65,25 @@ export function Tab1Executive({ projects, portfolio }: Props) {
     .filter(co => co.status.toLowerCase() !== 'approved')
     .reduce((sum, co) => sum + co.amount, 0)
 
-  const allBillingData = (projects[0]?.billing_history ?? []).map((b) => ({
-    period: b.period_end,
-    billed: b.period_total,
-    cost: b.cumulative_billed,
-  })).slice(0, 8)
+  // Aggregate billing data across all projects by period
+  const billingByPeriod = new Map<string, { billed: number; cumulative: number }>()
+  projects.forEach(p => {
+    (p.billing_history ?? []).forEach(b => {
+      const existing = billingByPeriod.get(b.period_end) || { billed: 0, cumulative: 0 }
+      billingByPeriod.set(b.period_end, {
+        billed: existing.billed + b.period_total,
+        cumulative: existing.cumulative + b.cumulative_billed,
+      })
+    })
+  })
+  const allBillingData = Array.from(billingByPeriod.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(0, 8)
+    .map(([period, data]) => ({
+      period,
+      billed: data.billed,
+      cost: data.cumulative,
+    }))
 
   const severityColor: Record<string, string> = {
     critical: '#ef4444',

@@ -6,8 +6,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from constants import RFI_LEVEL_HIGH_THRESHOLD, RFI_LEVEL_MEDIUM_THRESHOLD
-RFI_FILE = ROOT / "hvac_data" / "rfis_all.csv"
-CHANGE_FILE = ROOT / "hvac_data" / "change_orders_all.csv"
+
+# Read from cleaned data directory (output of 01_clean.py)
+RFI_FILE = ROOT / "data_cleaned" / "rfis_clean.csv"
+CHANGE_FILE = ROOT / "data_cleaned" / "change_orders_clean.csv"
 OUTPUT_FILE = ROOT / "output_summaries" / "rfi_summary.csv"
 
 con = duckdb.connect()
