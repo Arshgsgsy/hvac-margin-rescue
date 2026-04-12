@@ -22,7 +22,7 @@ COPY (
         rejected_value_ratio,
         total_rfis,
 
-        -- 🔥 RISK SCORE COMPONENTS
+        -- RISK SCORE COMPONENTS
         (
             -- financial loss
             CASE
