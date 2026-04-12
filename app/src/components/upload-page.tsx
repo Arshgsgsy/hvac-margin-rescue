@@ -191,9 +191,11 @@ export function UploadPage() {
 
   // Time range filter
   const [selectedTimeRange, setSelectedTimeRange] = useState('1y')
-  const [customStartDate, setCustomStartDate] = useState('2024-01-01')
-  const [customEndDate, setCustomEndDate] = useState('2024-12-31')
+  const [customStartDate, setCustomStartDate] = useState('Jan 2024')
+  const [customEndDate, setCustomEndDate] = useState('Dec 2025')
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false)
+  const [sliderStart, setSliderStart] = useState(0)
+  const [sliderEnd, setSliderEnd] = useState(24)
 
   useEffect(() => { return () => { runningRef.current = false } }, [])
 
@@ -797,51 +799,107 @@ export function UploadPage() {
                   </div>
                 </div>
 
-                {/* Time Range Slider */}
+                {/* Intuitive Time Range Slider */}
                 <div className="rounded-xl border border-border bg-card p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-foreground">Fine-tune date range</span>
-                    <span className="text-sm text-muted-foreground">
-                      {customStartDate || '2024-01-01'} — {customEndDate || '2025-12-31'}
-                    </span>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-medium text-foreground">Drag to adjust date range</span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                      <span className="text-sm font-medium text-foreground">{customStartDate || 'Jan 2024'}</span>
+                      <span className="text-muted-foreground">—</span>
+                      <span className="text-sm font-medium text-foreground">{customEndDate || 'Dec 2025'}</span>
+                    </div>
                   </div>
-                  <div className="relative pt-2 pb-4">
-                    <div className="h-2 rounded-full bg-muted relative">
+                  
+                  <div className="relative h-12 select-none">
+                    {/* Track background */}
+                    <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-2 rounded-full bg-muted" />
+                    
+                    {/* Active range highlight */}
+                    <div 
+                      className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full bg-primary"
+                      style={{ 
+                        left: `${((sliderStart || 0) / 24) * 100}%`, 
+                        right: `${100 - ((sliderEnd || 24) / 24) * 100}%` 
+                      }}
+                    />
+                    
+                    {/* Month markers */}
+                    {[0, 6, 12, 18, 24].map((month) => (
                       <div 
-                        className="absolute h-full rounded-full bg-gradient-to-r from-primary/60 to-primary"
-                        style={{ left: '10%', right: '10%' }}
+                        key={month}
+                        className="absolute top-1/2 -translate-y-1/2 w-1 h-4 bg-border rounded-full"
+                        style={{ left: `${(month / 24) * 100}%`, transform: 'translate(-50%, -50%)' }}
                       />
-                    </div>
+                    ))}
+                    
+                    {/* Start handle */}
                     <input
                       type="range"
                       min="0"
-                      max="100"
-                      defaultValue="0"
+                      max="24"
+                      value={sliderStart || 0}
                       onChange={(e) => {
-                        const months = ['2024-01', '2024-04', '2024-07', '2024-10', '2025-01', '2025-04', '2025-07', '2025-10', '2025-12']
-                        const idx = Math.floor((parseInt(e.target.value) / 100) * (months.length - 1))
-                        setCustomStartDate(`${months[idx]}-01`)
+                        const val = parseInt(e.target.value)
+                        if (val < (sliderEnd || 24)) {
+                          setSliderStart(val)
+                          const months = ['Jan 2024', 'Feb 2024', 'Mar 2024', 'Apr 2024', 'May 2024', 'Jun 2024', 
+                                         'Jul 2024', 'Aug 2024', 'Sep 2024', 'Oct 2024', 'Nov 2024', 'Dec 2024',
+                                         'Jan 2025', 'Feb 2025', 'Mar 2025', 'Apr 2025', 'May 2025', 'Jun 2025',
+                                         'Jul 2025', 'Aug 2025', 'Sep 2025', 'Oct 2025', 'Nov 2025', 'Dec 2025']
+                          setCustomStartDate(months[val])
+                        }
                       }}
-                      className="absolute top-0 left-0 w-1/2 h-6 opacity-0 cursor-grab active:cursor-grabbing"
+                      className="absolute top-0 left-0 w-full h-full opacity-0 cursor-grab active:cursor-grabbing z-20 pointer-events-auto"
+                      style={{ 
+                        clipPath: `inset(0 ${100 - ((sliderStart || 0) / 24) * 100 - 10}% 0 0)` 
+                      }}
                     />
+                    
+                    {/* End handle */}
                     <input
                       type="range"
                       min="0"
-                      max="100"
-                      defaultValue="100"
+                      max="24"
+                      value={sliderEnd || 24}
                       onChange={(e) => {
-                        const months = ['2024-01', '2024-04', '2024-07', '2024-10', '2025-01', '2025-04', '2025-07', '2025-10', '2025-12']
-                        const idx = Math.floor((parseInt(e.target.value) / 100) * (months.length - 1))
-                        setCustomEndDate(`${months[idx]}-28`)
+                        const val = parseInt(e.target.value)
+                        if (val > (sliderStart || 0)) {
+                          setSliderEnd(val)
+                          const months = ['Jan 2024', 'Feb 2024', 'Mar 2024', 'Apr 2024', 'May 2024', 'Jun 2024', 
+                                         'Jul 2024', 'Aug 2024', 'Sep 2024', 'Oct 2024', 'Nov 2024', 'Dec 2024',
+                                         'Jan 2025', 'Feb 2025', 'Mar 2025', 'Apr 2025', 'May 2025', 'Jun 2025',
+                                         'Jul 2025', 'Aug 2025', 'Sep 2025', 'Oct 2025', 'Nov 2025', 'Dec 2025']
+                          setCustomEndDate(months[val])
+                        }
                       }}
-                      className="absolute top-0 right-0 w-1/2 h-6 opacity-0 cursor-grab active:cursor-grabbing"
+                      className="absolute top-0 left-0 w-full h-full opacity-0 cursor-grab active:cursor-grabbing z-10 pointer-events-auto"
+                      style={{ 
+                        clipPath: `inset(0 0 0 ${((sliderEnd || 24) / 24) * 100 - 10}%)` 
+                      }}
                     />
-                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                      <span>Jan 2024</span>
-                      <span>Jul 2024</span>
-                      <span>Jan 2025</span>
-                      <span>Dec 2025</span>
+                    
+                    {/* Visible drag handles */}
+                    <div 
+                      className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-primary border-2 border-background shadow-lg cursor-grab active:cursor-grabbing active:scale-110 transition-transform z-30 pointer-events-none"
+                      style={{ left: `calc(${((sliderStart || 0) / 24) * 100}% - 10px)` }}
+                    >
+                      <div className="absolute inset-1 rounded-full bg-background" />
                     </div>
+                    <div 
+                      className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-primary border-2 border-background shadow-lg cursor-grab active:cursor-grabbing active:scale-110 transition-transform z-30 pointer-events-none"
+                      style={{ left: `calc(${((sliderEnd || 24) / 24) * 100}% - 10px)` }}
+                    >
+                      <div className="absolute inset-1 rounded-full bg-background" />
+                    </div>
+                  </div>
+                  
+                  {/* Timeline labels */}
+                  <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                    <span>Jan 2024</span>
+                    <span>Jul 2024</span>
+                    <span>Jan 2025</span>
+                    <span>Jul 2025</span>
+                    <span>Dec 2025</span>
                   </div>
                 </div>
 
