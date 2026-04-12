@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import time
 from pathlib import Path
 from config import PROJECT_ROOT, DATA_DIR, PIPELINE_DIR, sync_hvac_data_link
@@ -57,6 +58,13 @@ STAGES = [
     },
 ]
 
+SCRIPT_FILE_DEPENDENCIES = {
+    str((PIPELINE_DIR / "1_clean" / "material_summary.py").relative_to(PROJECT_ROOT)): {"material_deliveries_all.csv"},
+    str((PIPELINE_DIR / "1_clean" / "change_order_summary.py").relative_to(PROJECT_ROOT)): {"change_orders_all.csv"},
+    str((PIPELINE_DIR / "1_clean" / "rfi_summary.py").relative_to(PROJECT_ROOT)): {"rfis_all.csv"},
+    str((PIPELINE_DIR / "2_load" / "merge_material_budget.py").relative_to(PROJECT_ROOT)): {"material_deliveries_all.csv"},
+}
+
 
 def _ensure_hvac_data_symlink():
     """Pipeline scripts reference ROOT/hvac_data; keep it synced to the active dataset."""
@@ -90,6 +98,7 @@ def run_pipeline(available_files: list[str] | None = None):
         from config import EXPECTED_CSV_FILES
         available_files = EXPECTED_CSV_FILES
 
+    available_file_set = set(available_files)
     results = []
     for stage in STAGES:
         stage_start = time.time()
@@ -98,11 +107,18 @@ def run_pipeline(available_files: list[str] | None = None):
 
         for script in stage["scripts"]:
             script_name = str(script.relative_to(PROJECT_ROOT))
+            required_files = SCRIPT_FILE_DEPENDENCIES.get(script_name, set())
+            missing_files = sorted(required_files - available_file_set)
+            if missing_files:
+                logs.append(
+                    f"[SKIP] {script_name}: missing optional source files {missing_files}"
+                )
+                continue
 
             t0 = time.time()
             try:
                 result = subprocess.run(
-                    ["python", str(script)],
+                    [sys.executable, str(script)],
                     cwd=str(PROJECT_ROOT),
                     capture_output=True,
                     text=True,
@@ -110,14 +126,19 @@ def run_pipeline(available_files: list[str] | None = None):
                 )
                 elapsed = round(time.time() - t0, 1)
                 if result.returncode != 0:
-                    logs.append(f"[ERROR] {script_name} ({elapsed}s): {result.stderr.strip()}")
+                    error_text = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                    logs.append(f"[ERROR] {script_name} ({elapsed}s): {error_text[:500]}")
                     status = "error"
                     break
                 else:
                     out = result.stdout.strip()
                     logs.append(f"[OK] {script_name} ({elapsed}s)" + (f": {out[:200]}" if out else ""))
-            except subprocess.TimeoutExpired:
-                logs.append(f"[TIMEOUT] {script_name}: exceeded 300s")
+            except subprocess.TimeoutExpired as exc:
+                timeout_output = ((exc.stderr or "") + "\n" + (exc.stdout or "")).strip()
+                message = f"[TIMEOUT] {script_name}: exceeded 300s"
+                if timeout_output:
+                    message += f" | {timeout_output[:300]}"
+                logs.append(message)
                 status = "error"
                 break
 

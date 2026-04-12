@@ -38,6 +38,19 @@ OPTIONAL_CSV_FILES = [
 EXPECTED_CSV_FILES = REQUIRED_CSV_FILES + OPTIONAL_CSV_FILES
 
 
+def _has_dataset_files(path: Path) -> bool:
+    return path.exists() and any((path / filename).exists() for filename in EXPECTED_CSV_FILES)
+
+
+def _copy_dataset_files(source_dir: Path, target_dir: Path):
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for filename in EXPECTED_CSV_FILES:
+        source_file = source_dir / filename
+        if not source_file.exists():
+            continue
+        shutil.copy2(source_file, target_dir / filename)
+
+
 def ensure_runtime_dirs():
     """Create runtime directories used by uploads and pipeline outputs."""
     DATASET_ROOT.mkdir(parents=True, exist_ok=True)
@@ -56,6 +69,12 @@ def sync_hvac_data_link():
             return
         HVAC_DATA_LINK.unlink()
     elif HVAC_DATA_LINK.exists():
+        # Older checkouts may still contain a real hvac_data/ dataset directory.
+        # Seed the runtime dataset from it so the rest of the backend can keep using DATA_DIR.
+        if _has_dataset_files(HVAC_DATA_LINK):
+            if not _has_dataset_files(DATA_DIR):
+                _copy_dataset_files(HVAC_DATA_LINK, DATA_DIR)
+            return
         raise RuntimeError(
             f"{HVAC_DATA_LINK} exists and is not a symlink. Remove it or rename it to continue."
         )

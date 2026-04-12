@@ -27,7 +27,10 @@ def _read_csv(path: Path) -> pd.DataFrame | None:
 def _coerce_number(value, default=0.0):
     if value is None or pd.isna(value):
         return default
-    return value
+    parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(parsed):
+        return default
+    return float(parsed)
 
 
 def _normalize_severity(value) -> str:
@@ -124,7 +127,7 @@ def load_single_project(project_id: str) -> dict | None:
     flagged = _read_json(OUTPUT_DIR / "flagged_projects.json")
     if not flagged:
         return None
-    match = next((p for p in flagged if p["project_id"] == project_id), None)
+    match = next((p for p in flagged if p.get("project_id") == project_id), None)
     if not match:
         return None
     project = _transform_project(match)
@@ -201,7 +204,7 @@ def _transform_project(raw: dict) -> dict:
     pct_complete = min(actual_tracked / total_budget, 1.0) if total_budget > 0 else 0
 
     return {
-        "id": raw["project_id"],
+        "id": str(raw.get("project_id", "")).strip(),
         "name": raw.get("project_name", ""),
         "sector": _infer_sector(raw.get("project_name", "")),
         "contract_value": contract,
@@ -223,6 +226,19 @@ def _transform_project(raw: dict) -> dict:
         "recovery_actions": None,
         "field_note_summary": None,
     }
+
+
+def _safe_filter(df: pd.DataFrame | None, column: str, value) -> pd.DataFrame | None:
+    if df is None or column not in df.columns:
+        return None
+    return df[df[column] == value]
+
+
+def _row_value(row, *candidates, default=None):
+    for column in candidates:
+        if column in row and not pd.isna(row[column]):
+            return row[column]
+    return default
 
 
 def _infer_sector(name: str) -> str:
@@ -247,13 +263,24 @@ def _enrich_project(project: dict, project_id: str):
 
     # Labor by week
     labor_weekly = _read_csv(OUTPUT_DIR / "labor_project_week_summary.csv")
-    if labor_weekly is not None:
-        pw = labor_weekly[labor_weekly["project_id"] == project_id]
+    pw = _safe_filter(labor_weekly, "project_id", project_id)
+    if pw is not None:
         project["labor_by_week"] = [
             {
-                "week": row["week_start"],
-                "regular": round(row["total_hours_st"] * row["avg_hourly_rate"] * row["avg_burden_multiplier"], 0),
-                "overtime": round(row["total_hours_ot"] * row["avg_hourly_rate"] * row["avg_burden_multiplier"] * 1.5, 0),
+                "week": _row_value(row, "week_start"),
+                "regular": round(
+                    _coerce_number(_row_value(row, "total_hours_st"))
+                    * _coerce_number(_row_value(row, "avg_hourly_rate"))
+                    * _coerce_number(_row_value(row, "avg_burden_multiplier"), 1.0),
+                    0,
+                ),
+                "overtime": round(
+                    _coerce_number(_row_value(row, "total_hours_ot"))
+                    * _coerce_number(_row_value(row, "avg_hourly_rate"))
+                    * _coerce_number(_row_value(row, "avg_burden_multiplier"), 1.0)
+                    * 1.5,
+                    0,
+                ),
             }
             for _, row in pw.iterrows()
         ]
@@ -261,15 +288,15 @@ def _enrich_project(project: dict, project_id: str):
 
     # Change orders
     co_df = _read_csv(DATA_DIR / "change_orders_all.csv")
-    if co_df is not None:
-        co_proj = co_df[co_df["project_id"] == project_id]
+    co_proj = _safe_filter(co_df, "project_id", project_id)
+    if co_proj is not None:
         project["change_orders"] = [
             {
-                "id": row["co_number"],
-                "description": row["description"],
-                "amount": row["amount"],
-                "status": row["status"],
-                "reason_category": row["reason_category"],
+                "id": _row_value(row, "co_number"),
+                "description": _row_value(row, "description", default=""),
+                "amount": _coerce_number(_row_value(row, "amount")),
+                "status": _row_value(row, "status", default=""),
+                "reason_category": _row_value(row, "reason_category", default=""),
             }
             for _, row in co_proj.iterrows()
         ]
@@ -277,8 +304,8 @@ def _enrich_project(project: dict, project_id: str):
 
     # RFIs
     rfi_df = _read_csv(DATA_DIR / "rfis_all.csv")
-    if rfi_df is not None:
-        rfi_proj = rfi_df[rfi_df["project_id"] == project_id]
+    rfi_proj = _safe_filter(rfi_df, "project_id", project_id)
+    if rfi_proj is not None:
         today = datetime.now()
         rfis = []
         for _, row in rfi_proj.iterrows():
@@ -294,12 +321,12 @@ def _enrich_project(project: dict, project_id: str):
                     days_open = (today - submitted_at.to_pydatetime()).days
 
             rfis.append({
-                "id": row.get("rfi_number"),
+                "id": _row_value(row, "rfi_number"),
                 "status": status,
                 "days_open": days_open,
-                "description": row.get("subject", ""),
-                "priority": row.get("priority", ""),
-                "cost_impact": row.get("cost_impact", False),
+                "description": _row_value(row, "subject", default=""),
+                "priority": _row_value(row, "priority", default=""),
+                "cost_impact": _row_value(row, "cost_impact", default=False),
             })
 
         project["rfis"] = rfis
@@ -309,21 +336,23 @@ def _enrich_project(project: dict, project_id: str):
     sov_df = _read_csv(DATA_DIR / "sov_budget_all.csv")
     labor_sov = _read_csv(OUTPUT_DIR / "labor_project_sov_summary.csv")
     material_sov = _read_csv(OUTPUT_DIR / "material_project_sov_summary.csv")
-    if sov_df is not None:
-        sov_proj = sov_df[sov_df["project_id"] == project_id]
+    sov_proj = _safe_filter(sov_df, "project_id", project_id)
+    if sov_proj is not None:
         sov_lines = []
         for _, row in sov_proj.iterrows():
-            line_id = row["sov_line_id"]
-            budgeted = row.get("estimated_labor_cost", 0) + row.get("estimated_material_cost", 0)
+            line_id = _row_value(row, "sov_line_id")
+            budgeted = _coerce_number(_row_value(row, "estimated_labor_cost")) + _coerce_number(
+                _row_value(row, "estimated_material_cost")
+            )
             actual = 0
-            if labor_sov is not None:
+            if labor_sov is not None and {"project_id", "sov_line_id"}.issubset(labor_sov.columns):
                 lm = labor_sov[(labor_sov["project_id"] == project_id) & (labor_sov["sov_line_id"] == line_id)]
                 if len(lm) > 0:
-                    actual += lm.iloc[0].get("total_labor_cost", 0)
-            if material_sov is not None:
+                    actual += _coerce_number(lm.iloc[0].get("total_labor_cost"))
+            if material_sov is not None and {"project_id", "sov_line_id"}.issubset(material_sov.columns):
                 mm = material_sov[(material_sov["project_id"] == project_id) & (material_sov["sov_line_id"] == line_id)]
                 if len(mm) > 0:
-                    actual += mm.iloc[0].get("total_material_cost", 0)
+                    actual += _coerce_number(mm.iloc[0].get("total_material_cost"))
             sov_lines.append({
                 "name": line_id,
                 "budgeted": budgeted,
@@ -334,15 +363,15 @@ def _enrich_project(project: dict, project_id: str):
 
     # Material deliveries
     mat_df = _read_csv(DATA_DIR / "material_deliveries_all.csv")
-    if mat_df is not None:
-        mat_proj = mat_df[mat_df["project_id"] == project_id]
+    mat_proj = _safe_filter(mat_df, "project_id", project_id)
+    if mat_proj is not None:
         project["material_deliveries"] = [
             {
-                "description": row["item_description"],
-                "total_cost": row["total_cost"],
-                "date": row["date"],
-                "condition": row.get("condition_notes", ""),
-                "vendor": row.get("vendor", ""),
+                "description": _row_value(row, "item_description", default=""),
+                "total_cost": _coerce_number(_row_value(row, "total_cost")),
+                "date": _row_value(row, "date"),
+                "condition": _row_value(row, "condition_notes", default=""),
+                "vendor": _row_value(row, "vendor", default=""),
             }
             for _, row in mat_proj.iterrows()
         ]
@@ -350,29 +379,33 @@ def _enrich_project(project: dict, project_id: str):
 
     # Billing history
     bill_df = _read_csv(DATA_DIR / "billing_history_all.csv")
-    if bill_df is not None:
-        bill_proj = bill_df[bill_df["project_id"] == project_id]
+    bill_proj = _safe_filter(bill_df, "project_id", project_id)
+    if bill_proj is not None:
         project["billing_history"] = [
             {
-                "period_end": row["period_end"],
-                "period_total": row["period_total"],
-                "cumulative_billed": row["cumulative_billed"],
-                "retention_held": row.get("retention_held", 0),
-                "status": row.get("status", ""),
+                "period_end": _row_value(row, "period_end"),
+                "period_total": _coerce_number(_row_value(row, "period_total")),
+                "cumulative_billed": _coerce_number(_row_value(row, "cumulative_billed")),
+                "retention_held": _coerce_number(_row_value(row, "retention_held")),
+                "status": _row_value(row, "status", default=""),
             }
             for _, row in bill_proj.iterrows()
         ]
         enriched_sources.append("billing")
 
     # RFI by week (aggregate)
-    if rfi_df is not None:
-        rfi_proj = rfi_df[rfi_df["project_id"] == project_id].copy()
+    if rfi_proj is not None:
+        rfi_proj = rfi_proj.copy()
         if len(rfi_proj) > 0:
-            rfi_proj["date_submitted"] = pd.to_datetime(rfi_proj["date_submitted"], errors="coerce")
+            if "date_submitted" not in rfi_proj.columns:
+                rfi_proj = rfi_proj.iloc[0:0]
+            else:
+                rfi_proj["date_submitted"] = pd.to_datetime(rfi_proj["date_submitted"], errors="coerce")
             rfi_proj = rfi_proj[rfi_proj["date_submitted"].notna()]
         if len(rfi_proj) > 0:
             rfi_proj["week"] = rfi_proj["date_submitted"].dt.to_period("W").astype(str)
-            weekly = rfi_proj.groupby("week").agg(rfi_count=("rfi_number", "count")).reset_index()
+            count_column = "rfi_number" if "rfi_number" in rfi_proj.columns else "week"
+            weekly = rfi_proj.groupby("week").agg(rfi_count=(count_column, "count")).reset_index()
             project["rfi_by_week"] = [
                 {"week": row["week"], "rfi_count": int(row["rfi_count"])}
                 for _, row in weekly.iterrows()
@@ -381,14 +414,17 @@ def _enrich_project(project: dict, project_id: str):
 
     # Field notes summary
     field_notes_df = _read_csv(DATA_DIR / "field_notes_all.csv")
-    if field_notes_df is not None:
-        fn_proj = field_notes_df[field_notes_df["project_id"] == project_id]
+    fn_proj = _safe_filter(field_notes_df, "project_id", project_id)
+    if fn_proj is not None:
         if len(fn_proj) > 0:
             # Get recent field notes and summarize
-            notes = fn_proj.sort_values("date", ascending=False).head(5)
+            if "date" in fn_proj.columns:
+                notes = fn_proj.sort_values("date", ascending=False).head(5)
+            else:
+                notes = fn_proj.head(5)
             summaries = []
             for _, row in notes.iterrows():
-                note_text = row.get("content", row.get("notes", row.get("note", "")))
+                note_text = _row_value(row, "content", "notes", "note", default="")
                 if note_text and str(note_text).strip():
                     summaries.append(str(note_text).strip())
             if summaries:

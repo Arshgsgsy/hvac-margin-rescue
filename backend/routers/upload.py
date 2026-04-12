@@ -1,3 +1,4 @@
+import csv
 import shutil
 import tempfile
 import zipfile
@@ -17,6 +18,46 @@ from config import (
 )
 
 router = APIRouter()
+
+
+REQUIRED_COLUMNS_BY_FILE = {
+    "contracts_all.csv": {"project_id", "project_name", "original_contract_value"},
+    "labor_logs_all.csv": {
+        "project_id",
+        "log_id",
+        "date",
+        "employee_id",
+        "role",
+        "sov_line_id",
+        "hours_st",
+        "hours_ot",
+        "hourly_rate",
+        "burden_multiplier",
+    },
+    "billing_history_all.csv": {"project_id", "period_total", "cumulative_billed"},
+    "billing_line_items_all.csv": {"project_id"},
+    "change_orders_all.csv": {"project_id", "co_number", "amount", "status"},
+    "material_deliveries_all.csv": {
+        "project_id",
+        "delivery_id",
+        "date",
+        "sov_line_id",
+        "material_category",
+        "item_description",
+        "quantity",
+        "unit_cost",
+        "total_cost",
+    },
+    "rfis_all.csv": {"project_id", "rfi_number", "date_submitted", "status"},
+    "field_notes_all.csv": {"project_id", "date"},
+    "sov_all.csv": {"project_id", "sov_line_id"},
+    "sov_budget_all.csv": {
+        "project_id",
+        "sov_line_id",
+        "estimated_labor_cost",
+        "estimated_material_cost",
+    },
+}
 
 
 @router.post("/upload")
@@ -148,6 +189,7 @@ async def _copy_csv_file(
     dest = staging_dir / dest_name
     with dest.open("wb") as handle:
         shutil.copyfileobj(uploaded_file.file, handle)
+    _validate_csv_schema(dest_name, dest)
     accepted.append({"name": dest_name, "size_bytes": dest.stat().st_size})
 
 
@@ -175,6 +217,7 @@ async def _extract_zip_file(
             dest = staging_dir / dest_name
             with archive.open(member) as src, dest.open("wb") as handle:
                 shutil.copyfileobj(src, handle)
+            _validate_csv_schema(dest_name, dest)
             accepted.append({"name": dest_name, "size_bytes": dest.stat().st_size})
 
 
@@ -187,6 +230,30 @@ def _validate_expected_filename(filename: str, seen_files: set[str]):
             f"Unexpected file '{filename}'. Expected one of: {EXPECTED_CSV_FILES}",
         )
     seen_files.add(filename)
+
+
+def _validate_csv_schema(filename: str, path: Path):
+    required_columns = REQUIRED_COLUMNS_BY_FILE.get(filename, set())
+    if not required_columns:
+        return
+
+    try:
+        with path.open("r", encoding="utf-8-sig", errors="replace", newline="") as handle:
+            reader = csv.reader(handle)
+            headers = next(reader, None)
+    except Exception as exc:
+        raise HTTPException(400, f"Could not read '{filename}' as CSV: {exc}") from exc
+
+    if not headers:
+        raise HTTPException(400, f"'{filename}' is empty or missing a header row.")
+
+    normalized_headers = {str(header).strip() for header in headers if str(header).strip()}
+    missing_columns = sorted(required_columns - normalized_headers)
+    if missing_columns:
+        raise HTTPException(
+            400,
+            f"'{filename}' is missing required columns: {missing_columns}",
+        )
 
 
 def _get_degraded_features(missing_optional: list[str]) -> list[str]:
