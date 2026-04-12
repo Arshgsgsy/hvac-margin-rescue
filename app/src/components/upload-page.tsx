@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2 } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight } from 'lucide-react'
 
 interface UploadedFile {
   name: string
@@ -318,42 +318,62 @@ export function UploadPage({ onComplete }: UploadPageProps) {
               </div>
             )}
 
-            {/* Steps - idle steps are collapsed to a single line */}
+            {/* Steps - only running step shows logs, idle and complete are collapsed */}
             <div className="space-y-2">
               {STEPS.map((step, i) => {
                 const status = statuses[i]
-                const isCollapsed = status === 'idle'
+                const isRunning = status === 'running'
                 
                 return (
                   <div
                     key={step.id}
-                    className={`rounded-xl border overflow-hidden transition-all duration-300 ${isCollapsed ? 'opacity-40' : ''}`}
+                    className={`rounded-xl border overflow-hidden transition-all duration-300 ${status === 'idle' ? 'opacity-40' : ''}`}
                     style={{
                       borderColor: statusColor(status),
                       background: status === 'complete' ? 'rgba(16,185,129,0.08)' : status === 'running' ? 'rgba(59,130,246,0.08)' : 'hsl(var(--card))',
                     }}
                   >
-                    {/* Collapsed view for idle steps */}
-                    {isCollapsed ? (
-                      <div className="flex items-center gap-3 px-4 py-2">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium bg-muted text-muted-foreground flex-shrink-0">
-                          {i + 1}
+                    {/* Collapsed view for idle and complete steps */}
+                    {!isRunning ? (
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <div 
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+                          style={{ 
+                            background: status === 'complete' ? '#10b981' : 'hsl(var(--muted))',
+                            color: status === 'complete' ? '#fff' : 'hsl(var(--muted-foreground))'
+                          }}
+                        >
+                          {status === 'complete' ? (
+                            <CheckCircle2 className="w-4 h-4" />
+                          ) : (
+                            <span>{i + 1}</span>
+                          )}
                         </div>
-                        <span className="text-sm text-muted-foreground">{step.label}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-semibold ${status === 'complete' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              {step.label}
+                            </span>
+                            <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
+                              {step.script}
+                            </code>
+                            {status === 'complete' && (
+                              <span className="text-xs text-emerald-500">done</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{step.description}</p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                       </div>
                     ) : (
                       <>
-                        {/* Expanded view for running/complete steps */}
+                        {/* Expanded view for running step only */}
                         <div className="flex items-center gap-4 px-5 py-3">
                           <div
                             className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                            style={{ background: statusColor(status), color: '#fff' }}
+                            style={{ background: '#3b82f6', color: '#fff' }}
                           >
-                            {status === 'complete' ? (
-                              <CheckCircle2 className="w-4 h-4" />
-                            ) : (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            )}
+                            <Loader2 className="w-4 h-4 animate-spin" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 flex-wrap">
@@ -361,12 +381,7 @@ export function UploadPage({ onComplete }: UploadPageProps) {
                               <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
                                 {step.script}
                               </code>
-                              {status === 'running' && (
-                                <span className="text-xs text-primary">running...</span>
-                              )}
-                              {status === 'complete' && (
-                                <span className="text-xs text-emerald-500">done</span>
-                              )}
+                              <span className="text-xs text-primary">running...</span>
                             </div>
                             <p className="text-xs mt-0.5 text-muted-foreground">{step.description}</p>
                           </div>
@@ -394,9 +409,7 @@ export function UploadPage({ onComplete }: UploadPageProps) {
                                 {line.startsWith('[DONE]') ? '' : '> '}{line}
                               </div>
                             ))}
-                            {status === 'running' && (
-                              <span className="text-primary animate-pulse">|</span>
-                            )}
+                            <span className="text-primary animate-pulse">|</span>
                           </div>
                         )}
                       </>

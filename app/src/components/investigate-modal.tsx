@@ -3,7 +3,10 @@
 import { useState } from 'react'
 import { Project } from '@/lib/types'
 import { formatCurrency, formatPercent } from '@/lib/data'
-import { X, AlertTriangle, ListChecks, BarChart3, TrendingDown, DollarSign, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { 
+  X, AlertTriangle, ListChecks, BarChart3, TrendingDown, DollarSign, ArrowRight, CheckCircle2,
+  LayoutDashboard, Layers, Users, AlertCircle, FileText
+} from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -21,14 +24,24 @@ interface InvestigateModalProps {
 }
 
 type TabType = 'recommendation' | 'breakdown' | 'charts'
+type SideTabType = 'executive' | 'sov' | 'labor' | 'friction' | null
 
 export function InvestigateModal({ project, onClose }: InvestigateModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('recommendation')
+  const [activeSideTab, setActiveSideTab] = useState<SideTabType>(null)
 
   const tabs: { id: TabType; label: string }[] = [
     { id: 'recommendation', label: 'Recommendation' },
     { id: 'breakdown', label: 'Breakdown' },
     { id: 'charts', label: 'Charts' },
+  ]
+
+  // Side navigation tabs - advanced views
+  const sideTabs: { id: SideTabType; label: string; icon: React.ReactNode; description: string }[] = [
+    { id: 'executive', label: 'Executive', icon: <LayoutDashboard className="w-5 h-5" />, description: 'Portfolio View' },
+    { id: 'sov', label: 'SOV', icon: <Layers className="w-5 h-5" />, description: 'Variance Drill-down' },
+    { id: 'labor', label: 'Labor', icon: <Users className="w-5 h-5" />, description: 'Cost Analysis' },
+    { id: 'friction', label: 'Friction', icon: <AlertCircle className="w-5 h-5" />, description: 'Issue Tracker' },
   ]
 
   const severityConfig = {
@@ -48,57 +61,317 @@ export function InvestigateModal({ project, onClose }: InvestigateModalProps) {
         onClick={onClose}
       />
       
-      {/* Modal */}
-      <div className="relative w-full max-w-3xl max-h-[85vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: config.color }}
-            />
-            <div>
-              <h2 className="text-lg font-bold text-foreground">{project.name}</h2>
-              <p className="text-sm text-muted-foreground">{project.sector} | {project.id}</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 px-6 py-3 border-b border-border/50 bg-muted/30">
-          {tabs.map((tab) => (
+      {/* Modal with side navigation */}
+      <div className="relative flex w-full max-w-5xl max-h-[85vh]">
+        {/* Side navigation - small square tiles */}
+        <div className="flex flex-col gap-2 mr-3">
+          {sideTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              onClick={() => setActiveSideTab(activeSideTab === tab.id ? null : tab.id)}
+              className={`w-16 h-16 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
+                activeSideTab === tab.id
+                  ? 'bg-primary border-primary text-primary-foreground scale-105 shadow-lg'
+                  : 'bg-card/90 border-border/50 text-muted-foreground hover:bg-card hover:border-primary/50 hover:text-foreground'
               }`}
+              title={`${tab.label}: ${tab.description}`}
             >
-              {tab.label}
+              {tab.icon}
+              <span className="text-[10px] font-medium">{tab.label}</span>
             </button>
           ))}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === 'recommendation' && (
-            <RecommendationTab project={project} config={config} totalOverrun={totalOverrun} />
-          )}
-          {activeTab === 'breakdown' && (
-            <BreakdownTab project={project} totalOverrun={totalOverrun} />
-          )}
-          {activeTab === 'charts' && (
-            <ChartsTab project={project} />
-          )}
+        {/* Main modal content */}
+        <div className="flex-1 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: config.color }}
+              />
+              <div>
+                <h2 className="text-lg font-bold text-foreground">{project.name}</h2>
+                <p className="text-sm text-muted-foreground">{project.sector} | {project.id}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
+
+          {/* Main 3 Tabs */}
+          <div className="flex gap-2 px-6 py-3 border-b border-border/50 bg-muted/30">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id); setActiveSideTab(null) }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === tab.id && !activeSideTab
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {/* Show side tab content if active */}
+            {activeSideTab === 'executive' && (
+              <ExecutiveView project={project} />
+            )}
+            {activeSideTab === 'sov' && (
+              <SOVView project={project} />
+            )}
+            {activeSideTab === 'labor' && (
+              <LaborView project={project} />
+            )}
+            {activeSideTab === 'friction' && (
+              <FrictionView project={project} />
+            )}
+            
+            {/* Show main tab content if no side tab active */}
+            {!activeSideTab && activeTab === 'recommendation' && (
+              <RecommendationTab project={project} config={config} totalOverrun={totalOverrun} />
+            )}
+            {!activeSideTab && activeTab === 'breakdown' && (
+              <BreakdownTab project={project} totalOverrun={totalOverrun} />
+            )}
+            {!activeSideTab && activeTab === 'charts' && (
+              <ChartsTab project={project} />
+            )}
+          </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Advanced Side Views
+function ExecutiveView({ project }: { project: Project }) {
+  const totalOverrun = project.laborOverrun + project.materialOverrun
+  const recoveryPotential = project.recoveryActions.reduce((sum, a) => sum + a.amount, 0)
+  
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-4">
+        <LayoutDashboard className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-bold text-foreground">Executive Portfolio View</h3>
+      </div>
+      
+      {/* Key Metrics Grid */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(project.contractValue)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Contract Value</p>
+        </div>
+        <div className="rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold text-foreground">{formatPercent(project.bidMargin)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Bid Margin</p>
+        </div>
+        <div className="rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold text-red-400">{formatPercent(project.realizedMargin)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Realized Margin</p>
+        </div>
+        <div className="rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold text-amber-400">{formatCurrency(totalOverrun)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Total Overrun</p>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="rounded-xl border border-border p-5">
+        <h4 className="font-semibold text-foreground mb-3">Executive Summary</h4>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {project.name} is currently experiencing a margin erosion of {formatPercent(Math.abs(project.marginDelta))} 
+          from the original bid margin of {formatPercent(project.bidMargin)}. The project has accumulated 
+          {formatCurrency(totalOverrun)} in cost overruns primarily due to {project.rootCause.toLowerCase()}.
+          Recovery potential is estimated at {formatCurrency(recoveryPotential)} through recommended actions.
+        </p>
+      </div>
+
+      {/* Timeline Status */}
+      <div className="rounded-xl border border-border p-5">
+        <h4 className="font-semibold text-foreground mb-3">Completion Status</h4>
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-muted-foreground">Project Progress</span>
+              <span className="font-medium text-foreground">{formatPercent(project.billingStatus.percentComplete)}</span>
+            </div>
+            <div className="h-3 rounded-full bg-muted overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-primary to-emerald-500 rounded-full"
+                style={{ width: `${project.billingStatus.percentComplete * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SOVView({ project }: { project: Project }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Layers className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-bold text-foreground">SOV Variance Drill-down</h3>
+      </div>
+
+      {/* SOV Lines Table */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Line Item</th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Budgeted</th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Actual</th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Variance</th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">%</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {project.sovLines.map((line, i) => {
+              const variance = line.actual - line.budgeted
+              const variancePct = line.budgeted > 0 ? (variance / line.budgeted) : 0
+              return (
+                <tr key={i} className="hover:bg-muted/30">
+                  <td className="px-4 py-3 text-sm text-foreground">{line.name}</td>
+                  <td className="px-4 py-3 text-sm text-right text-muted-foreground">{formatCurrency(line.budgeted)}</td>
+                  <td className="px-4 py-3 text-sm text-right text-foreground">{formatCurrency(line.actual)}</td>
+                  <td className={`px-4 py-3 text-sm text-right font-medium ${variance > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {variance > 0 ? '+' : ''}{formatCurrency(variance)}
+                  </td>
+                  <td className={`px-4 py-3 text-sm text-right ${variancePct > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {variancePct > 0 ? '+' : ''}{formatPercent(variancePct)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function LaborView({ project }: { project: Project }) {
+  const laborData = project.laborByWeek.map(week => ({
+    name: week.week,
+    Regular: week.regular,
+    Overtime: week.overtime,
+    Total: week.regular + week.overtime,
+  }))
+
+  const totalRegular = project.laborByWeek.reduce((sum, w) => sum + w.regular, 0)
+  const totalOvertime = project.laborByWeek.reduce((sum, w) => sum + w.overtime, 0)
+  const overtimeRatio = totalOvertime / (totalRegular + totalOvertime)
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Users className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-bold text-foreground">Labor & Material Cost Analysis</h3>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-xs text-muted-foreground mb-1">Labor Budget</p>
+          <p className="text-xl font-bold text-foreground">{formatCurrency(project.laborCost.budget)}</p>
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-xs text-muted-foreground mb-1">Labor Actual</p>
+          <p className="text-xl font-bold text-red-400">{formatCurrency(project.laborCost.actual)}</p>
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-xs text-muted-foreground mb-1">Overtime Ratio</p>
+          <p className="text-xl font-bold text-amber-400">{formatPercent(overtimeRatio)}</p>
+        </div>
+      </div>
+
+      {/* Labor by Week Chart */}
+      <div className="rounded-xl border border-border p-5">
+        <h4 className="font-semibold text-foreground mb-4">Weekly Labor Breakdown</h4>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={laborData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
+              <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                formatter={(value: number) => formatCurrency(value)}
+              />
+              <Legend />
+              <Bar dataKey="Regular" stackId="labor" fill="#10b981" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="Overtime" stackId="labor" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FrictionView({ project }: { project: Project }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-4">
+        <AlertCircle className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-bold text-foreground">Friction Log & Issue Tracker</h3>
+      </div>
+
+      {/* Field Notes */}
+      <div className="rounded-xl border border-border p-5">
+        <h4 className="font-semibold text-foreground mb-3">Field Notes Summary</h4>
+        <p className="text-sm text-muted-foreground leading-relaxed">{project.fieldNoteSummary}</p>
+      </div>
+
+      {/* Change Orders */}
+      <div>
+        <h4 className="font-semibold text-foreground mb-3">Change Orders</h4>
+        <div className="space-y-2">
+          {project.changeOrders.map((co) => (
+            <div key={co.id} className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{co.description}</p>
+                  <p className="text-xs text-muted-foreground">{co.id}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className={`text-xs px-2 py-1 rounded ${
+                  co.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                  co.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                  'bg-muted text-muted-foreground'
+                }`}>
+                  {co.status}
+                </span>
+                <span className="text-sm font-semibold text-foreground">{formatCurrency(co.costIncurred)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Root Cause */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
+        <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-400" />
+          Identified Root Cause
+        </h4>
+        <p className="text-sm text-muted-foreground">{project.rootCause}</p>
       </div>
     </div>
   )
