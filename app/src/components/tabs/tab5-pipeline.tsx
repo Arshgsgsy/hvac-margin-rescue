@@ -294,7 +294,7 @@ export function Tab5Pipeline({ portfolio, projects, onPipelineComplete }: Props)
 
               <div className="divide-y divide-border/30">
                 {top5.map((project, i) => {
-                  const Icon = SEVERITY_ICON[project.severity]
+                  const Icon = SEVERITY_ICON[project.severity] ?? SEVERITY_ICON.watch
                   const erosion = Math.abs(project.margin_delta) * 100
                   const recovery = project.recovery_actions?.reduce((s, a) => s + a.amount, 0) ?? 0
                   return (
@@ -304,13 +304,13 @@ export function Tab5Pipeline({ portfolio, projects, onPipelineComplete }: Props)
                       </div>
 
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${project.severity === 'critical' ? 'bg-red-500/10' : project.severity === 'warning' ? 'bg-yellow-500/10' : 'bg-blue-500/10'}`}>
-                        <Icon className={`w-4 h-4 ${SEVERITY_COLOR[project.severity]}`} />
+                        <Icon className={`w-4 h-4 ${SEVERITY_COLOR[project.severity] ?? SEVERITY_COLOR.watch}`} />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-foreground text-sm font-semibold truncate">{project.name}</p>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${SEVERITY_BADGE[project.severity]}`}>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${SEVERITY_BADGE[project.severity] ?? SEVERITY_BADGE.watch}`}>
                             {project.severity}
                           </span>
                         </div>

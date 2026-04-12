@@ -4,10 +4,11 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
 
 export async function POST(request: NextRequest) {
   try {
-    // Forward the request to the Python backend
+    const body = await request.text()
     const response = await fetch(`${BACKEND_URL}/pipeline/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      body: body || undefined,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
     })
 
     if (!response.ok) {

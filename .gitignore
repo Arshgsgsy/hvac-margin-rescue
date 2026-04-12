@@ -8,7 +8,8 @@ __pycache__/
 *.pyc
 .DS_Store
 *.tsbuildinfo
-hvac_data/
+hvac_data
+.runtime/
 
 # CSV data files
 

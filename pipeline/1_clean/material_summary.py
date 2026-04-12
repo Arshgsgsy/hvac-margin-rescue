@@ -1,4 +1,5 @@
 import duckdb
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -7,6 +8,12 @@ ROOT = Path(__file__).resolve().parents[2]
 INPUT_FILE = ROOT / "data_cleaned" / "material_deliveries_clean.csv"
 OUTPUT_DIR = ROOT / "output_summaries"
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+# Check if input file exists
+if not INPUT_FILE.exists():
+    print(f"[SKIP] Material file not found: {INPUT_FILE}")
+    print("Material summary skipped - no material data available")
+    sys.exit(0)
 
 con = duckdb.connect()
 

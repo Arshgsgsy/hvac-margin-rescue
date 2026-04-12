@@ -1,4 +1,5 @@
 import duckdb
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -8,15 +9,31 @@ OUTPUT_FILE = ROOT / "output_summaries" / "project_weekly_summary.csv"
 
 con = duckdb.connect()
 
+if not LABOR_FILE.exists():
+    print(f"[SKIP] Labor weekly summary file not found: {LABOR_FILE}")
+    print("Project weekly summary skipped - no labor data available")
+    sys.exit(0)
+
 con.execute(f"""
 CREATE OR REPLACE TABLE labor_weekly AS
 SELECT * FROM read_csv_auto('{LABOR_FILE}')
 """)
 
-con.execute(f"""
-CREATE OR REPLACE TABLE material_weekly AS
-SELECT * FROM read_csv_auto('{MATERIAL_FILE}')
-""")
+if MATERIAL_FILE.exists():
+    con.execute(f"""
+    CREATE OR REPLACE TABLE material_weekly AS
+    SELECT * FROM read_csv_auto('{MATERIAL_FILE}')
+    """)
+else:
+    print(f"[NOTE] Material weekly summary not found: {MATERIAL_FILE}")
+    print("Proceeding with labor-only weekly summary")
+    con.execute("""
+    CREATE OR REPLACE TABLE material_weekly (
+        project_id VARCHAR,
+        week_start DATE,
+        total_material_cost DOUBLE
+    )
+    """)
 
 con.execute(f"""
 COPY (

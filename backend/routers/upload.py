@@ -1,26 +1,204 @@
+import shutil
+import tempfile
+import zipfile
+from pathlib import Path
+
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from config import DATA_DIR, EXPECTED_CSV_FILES
+from config import (
+    DATA_DIR,
+    DATASET_ROOT,
+    EXPECTED_CSV_FILES,
+    REQUIRED_CSV_FILES,
+    OPTIONAL_CSV_FILES,
+    clear_generated_outputs,
+    ensure_runtime_dirs,
+    get_available_files,
+    replace_active_dataset,
+)
 
 router = APIRouter()
 
 
 @router.post("/upload")
 async def upload_csvs(files: list[UploadFile] = File(...)):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_runtime_dirs()
 
-    accepted = []
-    for f in files:
-        if not f.filename or not f.filename.endswith(".csv"):
-            raise HTTPException(400, f"File '{f.filename}' is not a CSV")
-        if f.filename not in EXPECTED_CSV_FILES:
-            raise HTTPException(
-                400,
-                f"Unexpected file '{f.filename}'. Expected one of: {EXPECTED_CSV_FILES}",
-            )
+    if not files:
+        raise HTTPException(400, "No files uploaded")
 
-        dest = DATA_DIR / f.filename
-        content = await f.read()
-        dest.write_bytes(content)
-        accepted.append({"name": f.filename, "size_bytes": len(content)})
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix="dataset_", dir=str(DATASET_ROOT))
+    )
 
-    return {"status": "ok", "files": accepted}
+    try:
+        accepted = await _extract_uploaded_files(files, staging_dir)
+        if not accepted:
+            raise HTTPException(400, "No supported CSV files were found in the upload.")
+
+        replace_active_dataset(staging_dir)
+        clear_generated_outputs()
+
+        # Import lazily to avoid loading the cache-heavy prompt module on startup.
+        try:
+            from prompts import clear_csv_cache
+
+            clear_csv_cache()
+        except Exception:
+            pass
+
+        file_status = get_available_files()
+        return {
+            "status": "ok",
+            "files": accepted,
+            "available_files": file_status["available"],
+            "missing_required": file_status["missing_required"],
+            "missing_optional": file_status["missing_optional"],
+            "can_run_pipeline": file_status["can_run_pipeline"],
+            "active_data_dir": str(DATA_DIR),
+        }
+    except HTTPException:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
+    except zipfile.BadZipFile as exc:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise HTTPException(400, f"Invalid ZIP archive: {exc}") from exc
+    except Exception as exc:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise HTTPException(500, f"Upload failed: {exc}") from exc
+    finally:
+        for uploaded_file in files:
+            await uploaded_file.close()
+
+
+@router.get("/upload/status")
+def get_upload_status():
+    """Check which CSV files are present and which are missing."""
+    file_status = get_available_files()
+    return {
+        "status": "ok",
+        "available_files": file_status["available"],
+        "missing_required": file_status["missing_required"],
+        "missing_optional": file_status["missing_optional"],
+        "total_available": len(file_status["available"]),
+        "total_expected": len(EXPECTED_CSV_FILES),
+        "can_run_pipeline": file_status["can_run_pipeline"],
+        "required_files": REQUIRED_CSV_FILES,
+        "optional_files": OPTIONAL_CSV_FILES,
+    }
+
+
+@router.get("/upload/validate")
+def validate_for_pipeline():
+    """Validate that required files are present before running pipeline."""
+    file_status = get_available_files()
+
+    if not file_status["can_run_pipeline"]:
+        return {
+            "valid": False,
+            "message": f"Missing required files: {file_status['missing_required']}",
+            "missing_required": file_status["missing_required"],
+            "missing_optional": file_status["missing_optional"],
+        }
+
+    return {
+        "valid": True,
+        "message": "All required files present. Pipeline can run.",
+        "available_files": file_status["available"],
+        "missing_optional": file_status["missing_optional"],
+        "degraded_features": _get_degraded_features(file_status["missing_optional"]),
+    }
+
+
+async def _extract_uploaded_files(
+    files: list[UploadFile], staging_dir: Path
+) -> list[dict[str, int | str]]:
+    """Extract CSVs from uploaded ZIP/CSV files into an isolated staging directory."""
+    accepted: list[dict[str, int | str]] = []
+    seen_files: set[str] = set()
+
+    for uploaded_file in files:
+        filename = uploaded_file.filename or ""
+        lowered = filename.lower()
+
+        if lowered.endswith(".csv"):
+            await _copy_csv_file(uploaded_file, Path(filename).name, staging_dir, accepted, seen_files)
+            continue
+
+        if lowered.endswith(".zip"):
+            await _extract_zip_file(uploaded_file, staging_dir, accepted, seen_files)
+            continue
+
+        raise HTTPException(
+            400,
+            f"Unsupported file '{filename}'. Upload CSV files directly or a ZIP containing CSVs.",
+        )
+
+    return accepted
+
+
+async def _copy_csv_file(
+    uploaded_file: UploadFile,
+    dest_name: str,
+    staging_dir: Path,
+    accepted: list[dict[str, int | str]],
+    seen_files: set[str],
+):
+    _validate_expected_filename(dest_name, seen_files)
+    uploaded_file.file.seek(0)
+    dest = staging_dir / dest_name
+    with dest.open("wb") as handle:
+        shutil.copyfileobj(uploaded_file.file, handle)
+    accepted.append({"name": dest_name, "size_bytes": dest.stat().st_size})
+
+
+async def _extract_zip_file(
+    uploaded_file: UploadFile,
+    staging_dir: Path,
+    accepted: list[dict[str, int | str]],
+    seen_files: set[str],
+):
+    uploaded_file.file.seek(0)
+    with zipfile.ZipFile(uploaded_file.file) as archive:
+        for member in archive.infolist():
+            if member.is_dir():
+                continue
+
+            dest_name = Path(member.filename).name
+            if not dest_name:
+                continue
+
+            if not dest_name.lower().endswith(".csv"):
+                continue
+
+            _validate_expected_filename(dest_name, seen_files)
+
+            dest = staging_dir / dest_name
+            with archive.open(member) as src, dest.open("wb") as handle:
+                shutil.copyfileobj(src, handle)
+            accepted.append({"name": dest_name, "size_bytes": dest.stat().st_size})
+
+
+def _validate_expected_filename(filename: str, seen_files: set[str]):
+    if filename in seen_files:
+        raise HTTPException(400, f"Duplicate file '{filename}' in upload.")
+    if filename not in EXPECTED_CSV_FILES:
+        raise HTTPException(
+            400,
+            f"Unexpected file '{filename}'. Expected one of: {EXPECTED_CSV_FILES}",
+        )
+    seen_files.add(filename)
+
+
+def _get_degraded_features(missing_optional: list[str]) -> list[str]:
+    """Map missing optional files to degraded features."""
+    feature_map = {
+        "billing_history_all.csv": "Billing history analysis",
+        "billing_line_items_all.csv": "Billing line item details",
+        "change_orders_all.csv": "Change order tracking and analysis",
+        "material_deliveries_all.csv": "Material cost tracking",
+        "rfis_all.csv": "RFI analysis and tracking",
+        "field_notes_all.csv": "Field note summaries",
+        "sov_all.csv": "Schedule of Values breakdown",
+        "sov_budget_all.csv": "SOV budget vs actual comparison",
+    }
+    return [feature_map[f] for f in missing_optional if f in feature_map]

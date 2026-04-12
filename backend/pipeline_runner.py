@@ -1,8 +1,7 @@
-import os
 import subprocess
 import time
 from pathlib import Path
-from config import PROJECT_ROOT, DATA_DIR, PIPELINE_DIR
+from config import PROJECT_ROOT, DATA_DIR, PIPELINE_DIR, sync_hvac_data_link
 
 STAGES = [
     {
@@ -60,11 +59,8 @@ STAGES = [
 
 
 def _ensure_hvac_data_symlink():
-    """Pipeline scripts reference ROOT/hvac_data but actual data is in ROOT/data."""
-    link_path = PROJECT_ROOT / "hvac_data"
-    if link_path.exists() or link_path.is_symlink():
-        return
-    os.symlink(str(DATA_DIR), str(link_path))
+    """Pipeline scripts reference ROOT/hvac_data; keep it synced to the active dataset."""
+    sync_hvac_data_link()
 
 
 def _ensure_pipeline_output_dirs():
@@ -80,9 +76,19 @@ def _copy_flagged_for_llm_export():
         dst.write_text(src.read_text())
 
 
-def run_pipeline():
+def run_pipeline(available_files: list[str] | None = None):
+    """Run the pipeline with optional graceful degradation for missing files.
+
+    Args:
+        available_files: List of available CSV filenames. If None, assumes all files present.
+    """
     _ensure_hvac_data_symlink()
     _ensure_pipeline_output_dirs()
+
+    # Default to all files if not specified (backward compatibility)
+    if available_files is None:
+        from config import EXPECTED_CSV_FILES
+        available_files = EXPECTED_CSV_FILES
 
     results = []
     for stage in STAGES:
@@ -92,6 +98,7 @@ def run_pipeline():
 
         for script in stage["scripts"]:
             script_name = str(script.relative_to(PROJECT_ROOT))
+
             t0 = time.time()
             try:
                 result = subprocess.run(
@@ -143,8 +150,21 @@ def run_pipeline():
 
     total_duration = sum(r["duration"] for r in results)
     overall_status = "error" if any(r["status"] == "error" for r in results) else "complete"
-    return {
+
+    response = {
         "status": overall_status,
         "total_duration_seconds": round(total_duration, 1),
         "steps": results,
+        "data_dir": str(DATA_DIR),
     }
+
+    if available_files is not None:
+        from config import OPTIONAL_CSV_FILES
+
+        missing_optional = [f for f in OPTIONAL_CSV_FILES if f not in available_files]
+        response["available_files"] = available_files
+        response["missing_optional"] = missing_optional
+        if missing_optional:
+            response["degraded_mode"] = True
+
+    return response

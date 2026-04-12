@@ -141,7 +141,7 @@ function ProjectRow({ project, onInvestigate }: ProjectRowProps) {
   const totalOverrun = project.laborOverrun + project.materialOverrun
 
   return (
-    <div className={`rounded-xl border p-5 transition-all duration-200 ${severityColors[project.severity]}`}>
+    <div className={`rounded-xl border p-5 transition-all duration-200 ${severityColors[project.severity] ?? severityColors.watch}`}>
       <div className="flex items-start justify-between gap-4">
         {/* Project info */}
         <div className="flex-1 min-w-0">

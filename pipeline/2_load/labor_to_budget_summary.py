@@ -1,10 +1,21 @@
 import duckdb
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from backend.config import DATA_DIR
+
 LABOR_SUMMARY_FILE = ROOT / "output_summaries" / "labor_project_sov_summary.csv"
-BUDGET_FILE = ROOT / "hvac_data" / "sov_budget_all.csv"
+BUDGET_FILE = DATA_DIR / "sov_budget_all.csv"
 OUTPUT_FILE = ROOT / "output_summaries" / "labor_vs_budget.csv"
+
+# Check if labor summary exists (required)
+if not LABOR_SUMMARY_FILE.exists():
+    print(f"[SKIP] Labor summary file not found: {LABOR_SUMMARY_FILE}")
+    print("Labor vs budget analysis skipped")
+    sys.exit(0)
 
 con = duckdb.connect()
 
@@ -14,11 +25,26 @@ SELECT *
 FROM read_csv_auto('{LABOR_SUMMARY_FILE}', header=True)
 """)
 
-con.execute(f"""
-CREATE OR REPLACE TABLE budget AS
-SELECT *
-FROM read_csv_auto('{BUDGET_FILE}', header=True)
-""")
+# Budget file is optional - if missing, create empty table
+if BUDGET_FILE.exists():
+    con.execute(f"""
+    CREATE OR REPLACE TABLE budget AS
+    SELECT *
+    FROM read_csv_auto('{BUDGET_FILE}', header=True)
+    """)
+else:
+    print(f"[NOTE] Budget file not found: {BUDGET_FILE}")
+    print("Proceeding without budget comparison")
+    con.execute("""
+    CREATE OR REPLACE TABLE budget (
+        project_id VARCHAR,
+        sov_line_id VARCHAR,
+        estimated_labor_hours DOUBLE,
+        estimated_labor_cost DOUBLE,
+        productivity_factor DOUBLE,
+        key_assumptions VARCHAR
+    )
+    """)
 
 con.execute(f"""
 COPY (

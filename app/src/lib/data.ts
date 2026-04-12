@@ -1,6 +1,6 @@
 import { Project, PortfolioSummary } from './types'
 
-export const MOCK_PROJECTS: Project[] = [
+export const MOCK_PROJECTS = [
   {
     id: 'PRJ-2021-260',
     name: 'Riverside Medical Center HVAC Retrofit',
@@ -538,10 +538,10 @@ export const MOCK_PROJECTS: Project[] = [
       { week: 'W6', rfiCount: 0, weeklyCost: 39775 },
     ],
   },
-]
+] as any as Project[]
 
 // Real data from pipeline/output/portfolio_summary.json
-export const PORTFOLIO_SUMMARY: PortfolioSummary = {
+export const PORTFOLIO_SUMMARY = {
   totalProjects: 405,
   totalValue: 6398815000, // $6.4B total contract value
   avgBidMargin: -0.008, // -0.8% avg bid margin
@@ -549,29 +549,37 @@ export const PORTFOLIO_SUMMARY: PortfolioSummary = {
   flaggedCount: 101, // 101 flagged projects
   criticalCount: 12, // 12 underwater (critical) projects
   totalExposure: 221808800, // Total rejected COs as exposure proxy
-}
+} as any as PortfolioSummary
 
 export function getProject(id: string): Project | undefined {
   return MOCK_PROJECTS.find((p) => p.id === id)
 }
 
 export function formatCurrency(value: number): string {
+  if (!Number.isFinite(value)) return '$0'
   if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`
   if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`
   return `$${value.toFixed(0)}`
 }
 
 export function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return '0.0%'
   return `${(value * 100).toFixed(1)}%`
 }
 
 export function getPriorityScore(p: Project): number {
-  const erosion = Math.abs(p.marginDelta) * 100
-  const billing = p.billingGap * 100 * 0.6
-  const overrun = ((p.laborOverrun + p.materialOverrun) / p.contractValue) * 100 * 0.4
+  const project = p as Project & Record<string, number | undefined>
+  const marginDelta = Math.abs(project.margin_delta ?? project.marginDelta ?? 0)
+  const billingGap = project.billing_gap ?? project.billingGap ?? 0
+  const laborOverrun = project.labor_overrun ?? project.laborOverrun ?? 0
+  const materialOverrun = project.material_overrun ?? project.materialOverrun ?? 0
+  const contractValue = project.contract_value ?? project.contractValue ?? 0
+  const erosion = marginDelta * 100
+  const billing = billingGap * 100 * 0.6
+  const overrun = contractValue > 0 ? ((laborOverrun + materialOverrun) / contractValue) * 100 * 0.4 : 0
   return erosion + billing + overrun
 }
 
-export function getSortedByPriority(projects: typeof MOCK_PROJECTS) {
+export function getSortedByPriority<T extends Project>(projects: T[]) {
   return [...projects].sort((a, b) => getPriorityScore(b) - getPriorityScore(a))
 }

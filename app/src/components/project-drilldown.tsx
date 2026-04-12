@@ -17,7 +17,7 @@ const severityStyle: Record<string, { text: string; bg: string }> = {
 }
 
 export default function ProjectDrilldown({ project }: Props) {
-  const cfg = severityStyle[project.severity]
+  const cfg = severityStyle[project.severity] ?? severityStyle.watch
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)

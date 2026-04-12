@@ -27,6 +27,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
+from backend.config import DATA_DIR
 from constants import (
     RETENTION_RATE,
     STAGE_COMPLETE_THRESHOLD,
@@ -57,7 +58,6 @@ except ImportError:
     HYBRID_AVAILABLE = False
 
 OUTPUT_DIR = PROJECT_ROOT / "output_summaries"
-DATA_DIR = PROJECT_ROOT / "data"
 FLAGGED_PROJECTS = OUTPUT_DIR / "flagged_projects.json"
 ANALYSIS_OUTPUT = OUTPUT_DIR / "project_analyses.json"
 PORTFOLIO_OUTPUT = OUTPUT_DIR / "portfolio_analysis.json"

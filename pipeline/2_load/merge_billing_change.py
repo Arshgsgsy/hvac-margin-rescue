@@ -1,10 +1,17 @@
 import duckdb
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BILLING_FILE = ROOT / "output_summaries" / "project_billing_analysis.csv"
 CHANGE_FILE = ROOT / "output_summaries" / "change_summary.csv"
 OUTPUT_FILE = ROOT / "output_summaries" / "project_full_analysis.csv"
+
+# Check if billing analysis exists (required for this step)
+if not BILLING_FILE.exists():
+    print(f"[SKIP] Billing analysis file not found: {BILLING_FILE}")
+    print("Merge billing/change skipped - no billing analysis available")
+    sys.exit(0)
 
 con = duckdb.connect()
 
@@ -14,11 +21,30 @@ SELECT *
 FROM read_csv_auto('{BILLING_FILE}', header=True)
 """)
 
-con.execute(f"""
-CREATE OR REPLACE TABLE change_summary AS
-SELECT *
-FROM read_csv_auto('{CHANGE_FILE}', header=True)
-""")
+# Change summary is optional
+if CHANGE_FILE.exists():
+    con.execute(f"""
+    CREATE OR REPLACE TABLE change_summary AS
+    SELECT *
+    FROM read_csv_auto('{CHANGE_FILE}', header=True)
+    """)
+else:
+    print(f"[NOTE] Change summary file not found: {CHANGE_FILE}")
+    print("Proceeding without change order data")
+    con.execute("""
+    CREATE OR REPLACE TABLE change_summary (
+        project_id VARCHAR,
+        total_change_orders INT,
+        approved_cos INT,
+        pending_cos INT,
+        rejected_cos INT,
+        total_co_value DOUBLE,
+        approved_value DOUBLE,
+        rejected_value DOUBLE,
+        total_schedule_impact DOUBLE,
+        total_labor_impact DOUBLE
+    )
+    """)
 
 con.execute(f"""
 COPY (

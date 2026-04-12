@@ -50,7 +50,7 @@ export function InvestigateModal({ project, onClose }: InvestigateModalProps) {
     watch: { color: '#3b82f6', label: 'Monitor', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
   }
 
-  const config = severityConfig[project.severity]
+  const config = severityConfig[project.severity] ?? severityConfig.watch
   const totalOverrun = project.laborOverrun + project.materialOverrun
 
   return (
@@ -157,7 +157,9 @@ export function InvestigateModal({ project, onClose }: InvestigateModalProps) {
 // Advanced Side Views
 function ExecutiveView({ project }: { project: Project }) {
   const totalOverrun = project.laborOverrun + project.materialOverrun
-  const recoveryPotential = project.recoveryActions.reduce((sum, a) => sum + a.amount, 0)
+  const recoveryActions = project.recoveryActions ?? []
+  const recoveryPotential = recoveryActions.reduce((sum, a) => sum + a.amount, 0)
+  const rootCause = project.rootCause ?? 'undetermined project factors'
   
   return (
     <div className="space-y-6">
@@ -192,7 +194,7 @@ function ExecutiveView({ project }: { project: Project }) {
         <p className="text-sm text-muted-foreground leading-relaxed">
           {project.name} is currently experiencing a margin erosion of {formatPercent(Math.abs(project.marginDelta))} 
           from the original bid margin of {formatPercent(project.bidMargin)}. The project has accumulated 
-          {formatCurrency(totalOverrun)} in cost overruns primarily due to {project.rootCause.toLowerCase()}.
+          {formatCurrency(totalOverrun)} in cost overruns primarily due to {rootCause.toLowerCase()}.
           Recovery potential is estimated at {formatCurrency(recoveryPotential)} through recommended actions.
         </p>
       </div>
@@ -412,7 +414,7 @@ function RecommendationTab({ project, config, totalOverrun }: TabProps) {
         <div className="rounded-xl border border-border p-4 text-center">
           <CheckCircle2 className="w-5 h-5 mx-auto mb-2 text-emerald-400" />
           <p className="text-2xl font-bold text-foreground">
-            {formatCurrency(project.recoveryActions.reduce((sum, a) => sum + a.amount, 0))}
+            {formatCurrency((project.recoveryActions ?? []).reduce((sum, a) => sum + a.amount, 0))}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Recovery Potential</p>
         </div>
@@ -425,7 +427,7 @@ function RecommendationTab({ project, config, totalOverrun }: TabProps) {
           Recommended Actions
         </h3>
         <div className="space-y-3">
-          {project.recoveryActions.map((action, index) => (
+          {(project.recoveryActions ?? []).map((action, index) => (
             <div
               key={index}
               className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors"

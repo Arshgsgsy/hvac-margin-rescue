@@ -22,7 +22,26 @@ con = duckdb.connect()
 # ── Load project_health from portfolio_scan output ───────────────────���──
 con.execute("""
 CREATE TABLE project_health AS
-SELECT * FROM read_csv_auto('output_summaries/project_health.csv', header=True)
+SELECT
+    * REPLACE (
+        TRY_CAST(original_contract_value AS DOUBLE) AS original_contract_value,
+        TRY_CAST(total_budget AS DOUBLE) AS total_budget,
+        TRY_CAST(co_approved_value AS DOUBLE) AS co_approved_value,
+        TRY_CAST(adjusted_contract AS DOUBLE) AS adjusted_contract,
+        TRY_CAST(actual_labor_cost AS DOUBLE) AS actual_labor_cost,
+        TRY_CAST(actual_material_cost AS DOUBLE) AS actual_material_cost,
+        TRY_CAST(actual_tracked_cost AS DOUBLE) AS actual_tracked_cost,
+        TRY_CAST(co_rejected_value AS DOUBLE) AS co_rejected_value,
+        TRY_CAST(bid_margin AS DOUBLE) AS bid_margin,
+        TRY_CAST(realized_margin_dollars AS DOUBLE) AS realized_margin_dollars,
+        TRY_CAST(realized_margin_pct AS DOUBLE) AS realized_margin_pct,
+        TRY_CAST(material_overrun_pct AS DOUBLE) AS material_overrun_pct,
+        TRY_CAST(labor_overrun_pct AS DOUBLE) AS labor_overrun_pct,
+        TRY_CAST(rfi_count AS DOUBLE) AS rfi_count,
+        TRY_CAST(rfi_cost_impact_count AS DOUBLE) AS rfi_cost_impact_count,
+        TRY_CAST(budget_coverage AS DOUBLE) AS budget_coverage
+    )
+FROM read_csv_auto('output_summaries/project_health.csv', header=True)
 """)
 
 # ════════════════════════════════════════════════════════���═════════════════
@@ -34,7 +53,7 @@ SELECT *,
         WHEN realized_margin_pct < {SEVERITY_CRITICAL_THRESHOLD} THEN 'Critical'
         WHEN realized_margin_pct < {SEVERITY_WARNING_THRESHOLD}  THEN 'Warning'
         WHEN realized_margin_pct < {SEVERITY_WATCH_THRESHOLD}  THEN 'Watch'
-        ELSE 'OK'
+        ELSE 'Watch'
     END AS severity
 FROM project_health
 WHERE

@@ -31,11 +31,16 @@ def _load_csv(filename: str) -> pd.DataFrame | None:
         for directory in [OUTPUT_DIR, DATA_DIR]:
             path = directory / filename
             if path.exists():
-                _csv_cache[filename] = pd.read_csv(path)
+                _csv_cache[filename] = pd.read_csv(path, low_memory=False)
                 break
         else:
             _csv_cache[filename] = None
     return _csv_cache[filename]
+
+
+def clear_csv_cache():
+    """Invalidate cached CSV data after a new dataset upload."""
+    _csv_cache.clear()
 
 
 def get_management_summary(project_id: str) -> dict | None:

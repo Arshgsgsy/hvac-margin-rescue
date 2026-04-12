@@ -25,20 +25,29 @@ from constants import (
 )
 
 
+def _require_api_key():
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY is not configured.")
+
+
 def stream_chat(project: dict, question: str):
     """Generator that yields text chunks from Claude for a project chat."""
+    _require_api_key()
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     context = build_project_context(project)
     prompt = root_cause_prompt(context, question)
 
-    with client.messages.stream(
-        model=LLM_MODEL_CHAT,
-        max_tokens=LLM_MAX_TOKENS_CHAT,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        for text in stream.text_stream:
-            yield text
+    try:
+        with client.messages.stream(
+            model=LLM_MODEL_CHAT,
+            max_tokens=LLM_MAX_TOKENS_CHAT,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            for text in stream.text_stream:
+                yield text
+    except Exception as exc:
+        yield f"\n[ERROR] Claude chat stream failed: {exc}"
 
 
 def _extract_json_from_response(text: str) -> dict:
@@ -58,6 +67,7 @@ def _extract_json_from_response(text: str) -> dict:
 
 async def run_diagnosis(project_packet: dict) -> dict:
     """Run diagnosis agent on a project (async)"""
+    _require_api_key()
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
@@ -75,6 +85,7 @@ async def run_diagnosis(project_packet: dict) -> dict:
 
 async def run_recommendations(diagnosis: dict, packet: dict) -> dict:
     """Run recommendation agent on diagnosis + packet (async)"""
+    _require_api_key()
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
@@ -113,6 +124,7 @@ async def analyze_project(project: dict) -> dict:
 
 def run_diagnosis_sync(project_packet: dict) -> dict:
     """Run diagnosis agent on a project (sync version)"""
+    _require_api_key()
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
@@ -130,6 +142,7 @@ def run_diagnosis_sync(project_packet: dict) -> dict:
 
 def run_recommendations_sync(diagnosis: dict, packet: dict) -> dict:
     """Run recommendation agent on diagnosis + packet (sync version)"""
+    _require_api_key()
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
@@ -232,6 +245,7 @@ PORTFOLIO_OPTIMIZATION_PROMPT = _load_portfolio_prompt()
 
 def run_portfolio_optimization_sync(portfolio_input: dict) -> dict:
     """Run portfolio optimization agent (sync version)"""
+    _require_api_key()
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
@@ -249,6 +263,7 @@ def run_portfolio_optimization_sync(portfolio_input: dict) -> dict:
 
 async def run_portfolio_optimization(portfolio_input: dict) -> dict:
     """Run portfolio optimization agent (async version)"""
+    _require_api_key()
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(

@@ -33,6 +33,7 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from backend.config import DATA_DIR
 from constants import (
     OVERTIME_MULTIPLIER,
     STAGE_COMPLETE_THRESHOLD,
@@ -44,7 +45,7 @@ from constants import (
     FIELD_NOTE_SUBJECT_LIMIT,
     TOP_FIELD_NOTES_LIMIT,
 )
-DEFAULT_HVAC_DIR = ROOT / "hvac_data"
+DEFAULT_HVAC_DIR = DATA_DIR
 DEFAULT_CLEANED_DIR = ROOT / "data_cleaned"
 DEFAULT_FLAGGED_FILE = ROOT / "pipeline" / "output" / "flagged_projects.json"
 DEFAULT_OUTPUT_DIR = ROOT / "pipeline" / "output" / "project_packets"
@@ -362,8 +363,14 @@ def build_packet(project_id: str, tables: dict[str, list[dict[str, Any]]]) -> di
     contract_value = num(contract_row.get("original_contract_value"))
     estimated_labor = sum_num(sov_budget, "estimated_labor_cost")
     estimated_material = sum_num(sov_budget, "estimated_material_cost")
-    estimated_other = sum_num(sov_budget, "estimated_equipment_cost") + sum_num(sov_budget, "estimated_sub_cost")
-    estimated_total = sum(value for value in [estimated_labor, estimated_material, estimated_other] if value is not None)
+    estimated_other_parts = [
+        sum_num(sov_budget, "estimated_equipment_cost"),
+        sum_num(sov_budget, "estimated_sub_cost"),
+    ]
+    estimated_other_values = [value for value in estimated_other_parts if value is not None]
+    estimated_other = round(sum(estimated_other_values), 2) if estimated_other_values else None
+    estimated_components = [value for value in [estimated_labor, estimated_material, estimated_other] if value is not None]
+    estimated_total = round(sum(estimated_components), 2) if estimated_components else None
 
     labor_actual = compute_labor_actual(labor_logs)
     material_actual = sum_num(material_deliveries, "total_cost")

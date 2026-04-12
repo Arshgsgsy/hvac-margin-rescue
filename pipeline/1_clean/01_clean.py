@@ -20,10 +20,10 @@ import duckdb
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from backend.config import DATA_DIR
 from constants import COST_DISCREPANCY_THRESHOLD
 
 # Input paths (raw data)
-DATA_DIR = ROOT / "data"
 LABOR_INPUT = DATA_DIR / "labor_logs_all.csv"
 MATERIAL_INPUT = DATA_DIR / "material_deliveries_all.csv"
 CHANGE_ORDER_INPUT = DATA_DIR / "change_orders_all.csv"
@@ -380,13 +380,40 @@ def main():
         "materials": {},
         "change_orders": {},
         "rfis": {},
+        "skipped": [],
     }
 
-    # Clean each dataset
-    report["labor"] = clean_labor_data(con)
-    report["materials"] = clean_material_data(con)
-    report["change_orders"] = clean_change_orders(con)
-    report["rfis"] = clean_rfis(con)
+    # Clean labor data (required)
+    if LABOR_INPUT.exists():
+        report["labor"] = clean_labor_data(con)
+    else:
+        print(f"[SKIP] Labor file not found: {LABOR_INPUT}")
+        report["labor"] = {"status": "skipped", "reason": "file_not_found"}
+        report["skipped"].append("labor_logs_all.csv")
+
+    # Clean materials data (optional)
+    if MATERIAL_INPUT.exists():
+        report["materials"] = clean_material_data(con)
+    else:
+        print(f"[SKIP] Material file not found: {MATERIAL_INPUT}")
+        report["materials"] = {"status": "skipped", "reason": "file_not_found"}
+        report["skipped"].append("material_deliveries_all.csv")
+
+    # Clean change orders (optional)
+    if CHANGE_ORDER_INPUT.exists():
+        report["change_orders"] = clean_change_orders(con)
+    else:
+        print(f"[SKIP] Change order file not found: {CHANGE_ORDER_INPUT}")
+        report["change_orders"] = {"status": "skipped", "reason": "file_not_found"}
+        report["skipped"].append("change_orders_all.csv")
+
+    # Clean RFIs (optional)
+    if RFI_INPUT.exists():
+        report["rfis"] = clean_rfis(con)
+    else:
+        print(f"[SKIP] RFI file not found: {RFI_INPUT}")
+        report["rfis"] = {"status": "skipped", "reason": "file_not_found"}
+        report["skipped"].append("rfis_all.csv")
 
     # Write quality report
     with open(QUALITY_REPORT_PATH, "w") as f:
@@ -396,25 +423,33 @@ def main():
     print("\n" + "=" * 60)
     print("Data Cleaning Complete")
     print("=" * 60)
-    print(f"\nLabor:")
-    print(f"  Input rows: {report['labor']['input_rows']:,}")
-    print(f"  Duplicates removed: {report['labor']['duplicates_removed']:,}")
-    print(f"  Roles normalized: {report['labor']['roles_normalized']:,}")
-    print(f"  Output rows: {report['labor']['output_rows']:,}")
 
-    print(f"\nMaterials:")
-    print(f"  Input rows: {report['materials']['input_rows']:,}")
-    print(f"  Categories normalized: {report['materials']['categories_normalized']:,}")
-    print(f"  Costs recalculated: {report['materials']['costs_recalculated']:,}")
-    print(f"  Output rows: {report['materials']['output_rows']:,}")
+    if report["labor"].get("status") != "skipped":
+        print(f"\nLabor:")
+        print(f"  Input rows: {report['labor']['input_rows']:,}")
+        print(f"  Duplicates removed: {report['labor']['duplicates_removed']:,}")
+        print(f"  Roles normalized: {report['labor']['roles_normalized']:,}")
+        print(f"  Output rows: {report['labor']['output_rows']:,}")
 
-    print(f"\nChange Orders:")
-    print(f"  Input rows: {report['change_orders']['input_rows']:,}")
-    print(f"  Output rows: {report['change_orders']['output_rows']:,}")
+    if report["materials"].get("status") != "skipped":
+        print(f"\nMaterials:")
+        print(f"  Input rows: {report['materials']['input_rows']:,}")
+        print(f"  Categories normalized: {report['materials']['categories_normalized']:,}")
+        print(f"  Costs recalculated: {report['materials']['costs_recalculated']:,}")
+        print(f"  Output rows: {report['materials']['output_rows']:,}")
 
-    print(f"\nRFIs:")
-    print(f"  Input rows: {report['rfis']['input_rows']:,}")
-    print(f"  Output rows: {report['rfis']['output_rows']:,}")
+    if report["change_orders"].get("status") != "skipped":
+        print(f"\nChange Orders:")
+        print(f"  Input rows: {report['change_orders']['input_rows']:,}")
+        print(f"  Output rows: {report['change_orders']['output_rows']:,}")
+
+    if report["rfis"].get("status") != "skipped":
+        print(f"\nRFIs:")
+        print(f"  Input rows: {report['rfis']['input_rows']:,}")
+        print(f"  Output rows: {report['rfis']['output_rows']:,}")
+
+    if report["skipped"]:
+        print(f"\nSkipped files (not found): {', '.join(report['skipped'])}")
 
     print(f"\nCleaned files written to: {CLEANED_DIR}")
     print(f"Quality report written to: {QUALITY_REPORT_PATH}")

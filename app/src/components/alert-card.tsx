@@ -35,7 +35,7 @@ const severityConfig = {
 }
 
 export function AlertCard({ project, rank }: AlertCardProps) {
-  const cfg = severityConfig[project.severity]
+  const cfg = severityConfig[project.severity] ?? severityConfig.watch
   const Icon = cfg.icon
   const erosion = Math.abs(project.margin_delta) * 100
   const score = getPriorityScore(project)

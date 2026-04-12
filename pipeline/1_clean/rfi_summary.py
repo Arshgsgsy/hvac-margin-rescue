@@ -12,6 +12,12 @@ RFI_FILE = ROOT / "data_cleaned" / "rfis_clean.csv"
 CHANGE_FILE = ROOT / "data_cleaned" / "change_orders_clean.csv"
 OUTPUT_FILE = ROOT / "output_summaries" / "rfi_summary.csv"
 
+# Check if input files exist
+if not RFI_FILE.exists():
+    print(f"[SKIP] RFI file not found: {RFI_FILE}")
+    print("RFI summary skipped - no RFI data available")
+    sys.exit(0)
+
 con = duckdb.connect()
 
 con.execute(f"""
@@ -20,11 +26,21 @@ SELECT *
 FROM read_csv_auto('{RFI_FILE}', header=True)
 """)
 
-con.execute(f"""
-CREATE OR REPLACE TABLE change_orders AS
-SELECT *
-FROM read_csv_auto('{CHANGE_FILE}', header=True)
-""")
+# Change orders are optional for RFI summary - used for linking analysis
+if CHANGE_FILE.exists():
+    con.execute(f"""
+    CREATE OR REPLACE TABLE change_orders AS
+    SELECT *
+    FROM read_csv_auto('{CHANGE_FILE}', header=True)
+    """)
+else:
+    # Create empty change_orders table with expected schema
+    con.execute("""
+    CREATE OR REPLACE TABLE change_orders (
+        project_id VARCHAR,
+        related_rfi VARCHAR
+    )
+    """)
 
 con.execute(f"""
 COPY (

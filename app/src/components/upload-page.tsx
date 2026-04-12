@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye, Users, Truck, Calendar } from 'lucide-react'
 import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
-import { Project } from '@/lib/types'
+import { PipelineResult, Project, UploadResult } from '@/lib/types'
+import { runPipeline as runBackendPipeline, uploadDataset } from '@/lib/api'
 import { InvestigateModal } from './investigate-modal'
 
 
@@ -170,6 +172,7 @@ const TIME_RANGES = [
 ]
 
 export function UploadPage() {
+  const router = useRouter()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -215,164 +218,156 @@ export function UploadPage() {
     fetch('/api/health')
       .then(res => res.json())
       .then(() => setBackendConnected(true))
-      .catch(() => setBackendConnected(true)) // Default to true for demo
+      .catch(() => setBackendConnected(false))
   }, [])
 
-  // Store actual File objects and CSV content for upload
+  // Store actual File objects for upload
   const [actualFiles, setActualFiles] = useState<File[]>([])
-  const [csvData, setCsvData] = useState<Record<string, string>>({})
-  const [pipelineResult, setPipelineResult] = useState<{
-    summary?: { total_projects: number; flagged_count: number; critical_count: number }
-    flagged_projects?: Array<{ project_id: string; project_name: string; severity: string }>
-  } | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<UploadResult | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [pipelineError, setPipelineError] = useState<string | null>(null)
+  const [pipelineResult, setPipelineResult] = useState<PipelineResult | null>(null)
+  const [redirecting, setRedirecting] = useState(false)
+
+  const resetWorkflow = () => {
+    setPipelineStarted(false)
+    setRunning(false)
+    setDone(false)
+    setRedirecting(false)
+    setPipelineError(null)
+    setStatuses(STEPS.map(() => 'idle'))
+    setVisibleLogs(STEPS.map(() => []))
+  }
 
   const runPipeline = async () => {
-    if (running || done) return
+    if (running || done || actualFiles.length === 0) return
+
+    setUploadError(null)
+    setPipelineError(null)
+    setUploadStatus(null)
+    setPipelineResult(null)
     setPipelineStarted(true)
     setRunning(true)
     runningRef.current = true
+    setStatuses(STEPS.map(() => 'idle'))
+    setVisibleLogs(STEPS.map(() => []))
 
-    // Check if we have real CSV data to process
-    const hasRealData = Object.keys(csvData).length > 0
+    try {
+      setStatuses((prev) => {
+        const next = [...prev]
+        next[0] = 'running'
+        return next
+      })
+      setVisibleLogs((prev) => {
+        const next = prev.map((lines) => [...lines])
+        next[0] = [
+          `[UPLOAD] Uploading ${actualFiles.length} file(s) to the active dataset...`,
+          '[UPLOAD] Replacing previous runtime dataset and clearing stale outputs...',
+        ]
+        return next
+      })
 
-    if (hasRealData) {
-      // Run REAL pipeline with actual data
-      try {
-        // Show initial status
-        setStatuses((prev) => { const n = [...prev]; n[0] = 'running'; return n })
-        setVisibleLogs((prev) => {
-          const n = prev.map((l) => [...l])
-          n[0] = ['[PIPELINE] Processing uploaded CSV data...', `[PIPELINE] Found ${Object.keys(csvData).length} CSV files`]
-          return n
-        })
+      setIsUploading(true)
+      const uploadResult = await uploadDataset(actualFiles)
+      setIsUploading(false)
+      setUploadStatus(uploadResult)
 
-        const response = await fetch('/api/pipeline/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ csvFiles: csvData }),
-        })
-
-        const result = await response.json()
-
-        if (result.status === 'complete' && result.steps) {
-          // Update UI with real pipeline results
-          for (let i = 0; i < result.steps.length && i < STEPS.length; i++) {
-            const backendStep = result.steps[i]
-            setStatuses((prev) => { 
-              const n = [...prev]
-              n[i] = backendStep.status === 'complete' ? 'complete' : 
-                     backendStep.status === 'error' ? 'error' : 'idle'
-              return n 
-            })
-            setVisibleLogs((prev) => {
-              const n = prev.map((l) => [...l])
-              n[i] = backendStep.logs || []
-              return n
-            })
-            // Small delay between steps for visual effect
-            await new Promise((r) => setTimeout(r, 300))
-          }
-          
-          // Store the results
-          setPipelineResult({
-            summary: result.summary,
-            flagged_projects: result.flagged_projects,
-          })
-        }
-
-        setRunning(false)
-        setDone(true)
-        return
-      } catch (error) {
-        console.error('[v0] Pipeline error, falling back to simulation:', error)
-      }
-    }
-
-    // Fallback: Run simulation with animated logs (no real data)
-    for (let i = 0; i < STEPS.length; i++) {
-      if (!runningRef.current) break
-      const step = STEPS[i]
-      setStatuses((prev) => { const n = [...prev]; n[i] = 'running'; return n })
-
-      const delay = step.duration / step.logs.length
-      for (let j = 0; j < step.logs.length; j++) {
-        if (!runningRef.current) break
-        await new Promise((r) => setTimeout(r, delay))
-        setVisibleLogs((prev) => {
-          const n = prev.map((l) => [...l])
-          n[i] = step.logs.slice(0, j + 1)
-          return n
-        })
-        const el = logRefs.current[i]
-        if (el) el.scrollTop = el.scrollHeight
+      if (!uploadResult.can_run_pipeline) {
+        throw new Error(`Missing required files: ${uploadResult.missing_required.join(', ')}`)
       }
 
-      await new Promise((r) => setTimeout(r, 150))
-      setStatuses((prev) => { const n = [...prev]; n[i] = 'complete'; return n })
-    }
+      const result = await runBackendPipeline()
+      setPipelineResult(result)
 
-    setRunning(false)
-    setDone(true)
+      for (let i = 0; i < result.steps.length && i < STEPS.length; i++) {
+        const backendStep = result.steps[i]
+        setStatuses((prev) => {
+          const next = [...prev]
+          next[i] = backendStep.status === 'complete'
+            ? 'complete'
+            : backendStep.status === 'error'
+              ? 'error'
+              : backendStep.status === 'running'
+                ? 'running'
+                : 'idle'
+          return next
+        })
+        setVisibleLogs((prev) => {
+          const next = prev.map((lines) => [...lines])
+          next[i] = backendStep.logs || []
+          return next
+        })
+        await new Promise((r) => setTimeout(r, 200))
+      }
+
+      if (result.status !== 'complete') {
+        const firstErrorStep = result.steps.find((step) => step.status === 'error')
+        const errorMessage = firstErrorStep?.logs.find((line) => line.includes('[ERROR]')) || 'Pipeline execution failed'
+        throw new Error(errorMessage)
+      }
+
+      setDone(true)
+      setRedirecting(true)
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 300)
+    } catch (error) {
+      setIsUploading(false)
+      const message = error instanceof Error ? error.message : 'Analysis failed'
+      setPipelineError(message)
+      setStatuses((prev) => {
+        const next = [...prev]
+        const failedIndex = next.findIndex((status) => status === 'running')
+        next[failedIndex >= 0 ? failedIndex : 0] = 'error'
+        return next
+      })
+      setVisibleLogs((prev) => {
+        const next = prev.map((lines) => [...lines])
+        const populatedIndexes = next
+          .map((lines, index) => (lines.length > 0 ? index : -1))
+          .filter((index) => index >= 0)
+        const targetIndex = populatedIndexes.length > 0 ? populatedIndexes[populatedIndexes.length - 1] : 0
+        next[targetIndex] = [...next[targetIndex], `[ERROR] ${message}`]
+        return next
+      })
+    } finally {
+      setRunning(false)
+    }
   }
 
-  const handleFiles = useCallback(async (fileList: FileList | null) => {
+  const handleFiles = useCallback((fileList: FileList | null) => {
     if (!fileList) return
-    
-    const newFiles: UploadedFile[] = []
-    const newActualFiles: File[] = []
-    
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i]
-      if (file.name.endsWith('.zip') || file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.json')) {
-        newFiles.push({
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/zip'
-        })
-        newActualFiles.push(file)
-      }
+
+    const selectedFiles = Array.from(fileList).filter((file) =>
+      file.name.toLowerCase().endsWith('.zip') || file.name.toLowerCase().endsWith('.csv')
+    )
+
+    if (selectedFiles.length === 0) {
+      setUploadError('Only ZIP archives and CSV files are supported.')
+      return
     }
-    
-    if (newFiles.length > 0) {
-      setIsUploading(true)
-      
-      try {
-        // Upload each file to the API and collect CSV data
-        for (const file of newActualFiles) {
-          const formData = new FormData()
-          formData.append('file', file)
-          
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          })
-          
-          // Parse response body once
-          const result = await response.json()
-          
-          if (!response.ok) {
-            throw new Error(result.error || 'Upload failed')
-          }
-          
-          // Store CSV content for pipeline
-          if (result.csvFiles) {
-            setCsvData(prev => ({ ...prev, ...result.csvFiles }))
-          }
-        }
-        
-        setFiles(prev => [...prev, ...newFiles])
-        setActualFiles(prev => [...prev, ...newActualFiles])
-        setUploadComplete(true)
-      } catch (error) {
-        console.error('[v0] Upload error:', error)
-        setFiles(prev => [...prev, ...newFiles])
-        setActualFiles(prev => [...prev, ...newActualFiles])
-        setUploadComplete(true)
-      } finally {
-        setIsUploading(false)
-      }
+
+    setUploadError(null)
+    setPipelineError(null)
+    setUploadStatus(null)
+
+    const fileMap = new Map<string, File>()
+    for (const file of actualFiles) {
+      fileMap.set(file.name, file)
     }
-  }, [])
+    for (const file of selectedFiles) {
+      fileMap.set(file.name, file)
+    }
+
+    const mergedFiles = Array.from(fileMap.values())
+    setActualFiles(mergedFiles)
+    setFiles(mergedFiles.map((file) => ({
+      name: file.name,
+      size: file.size,
+      type: file.type || 'application/octet-stream',
+    })))
+    setUploadComplete(mergedFiles.length > 0)
+  }, [actualFiles])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -391,10 +386,19 @@ export function UploadPage() {
   }, [])
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index))
-    if (files.length === 1) {
-      setUploadComplete(false)
-    }
+    setActualFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index)
+      setFiles(next.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+      })))
+      setUploadComplete(next.length > 0)
+      if (next.length === 0) {
+        setUploadStatus(null)
+      }
+      return next
+    })
   }
 
   const formatFileSize = (bytes: number) => {
@@ -520,7 +524,7 @@ export function UploadPage() {
                 <input
                   ref={inputRef}
                   type="file"
-                  accept=".zip,.csv,.xlsx,.json"
+                  accept=".zip,.csv"
                   multiple
                   onChange={(e) => handleFiles(e.target.files)}
                   className="hidden"
@@ -535,8 +539,8 @@ export function UploadPage() {
                   <div className="flex flex-col items-center gap-4">
                     <CheckCircle2 className="w-12 h-12 text-emerald-500" />
                     <div>
-                      <p className="text-foreground font-medium">Files uploaded successfully</p>
-                      <p className="text-muted-foreground text-sm mt-1">Click to add more files or drag and drop</p>
+                      <p className="text-foreground font-medium">Files queued for analysis</p>
+                      <p className="text-muted-foreground text-sm mt-1">Click to add more files or drag and drop before analyzing</p>
                     </div>
                   </div>
                 ) : (
@@ -549,7 +553,7 @@ export function UploadPage() {
                         Drop your files here, or <span className="text-primary">browse</span>
                       </p>
                       <p className="text-muted-foreground text-sm mt-2">
-                        Supports ZIP, CSV, XLSX, JSON
+                        Supports ZIP archives and CSV files
                       </p>
                     </div>
                   </div>
@@ -583,11 +587,31 @@ export function UploadPage() {
                 </div>
               )}
 
+              {uploadError && (
+                <div className="max-w-3xl mx-auto rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {uploadError}
+                </div>
+              )}
+
+              {uploadStatus && (
+                <div className="max-w-3xl mx-auto rounded-xl border border-border/50 bg-card/50 px-4 py-3 text-sm space-y-2">
+                  <div className="text-foreground">
+                    Active dataset will include <span className="font-semibold">{uploadStatus.files.length}</span> accepted file(s).
+                  </div>
+                  {uploadStatus.missing_optional.length > 0 && (
+                    <div className="text-muted-foreground">
+                      Optional files missing for degraded mode: {uploadStatus.missing_optional.join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Analyze button */}
               {files.length > 0 && (
                 <div className="flex justify-center">
                   <button
                     onClick={runPipeline}
+                    disabled={!backendConnected || running}
                     className="flex items-center gap-3 px-8 py-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-semibold text-lg shadow-lg shadow-primary/20"
                   >
                     <Zap className="w-5 h-5" />
@@ -633,6 +657,25 @@ export function UploadPage() {
                   5-step data pipeline: clean, load, scan, export, analyze
                 </p>
               </div>
+
+              {pipelineError && (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive space-y-3">
+                  <div>{pipelineError}</div>
+                  <button
+                    type="button"
+                    onClick={resetWorkflow}
+                    className="inline-flex items-center gap-2 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    Return to uploads
+                  </button>
+                </div>
+              )}
+
+              {redirecting && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-500">
+                  Analysis complete. Opening the live dashboard for the uploaded dataset...
+                </div>
+              )}
 
               {/* Progress bar */}
               {(running || done) && (
@@ -757,7 +800,7 @@ export function UploadPage() {
           )}
 
           {/* Executive Summary - shows after pipeline completes */}
-          {done && (
+          {done && !redirecting && (
             <div ref={summaryRef} className="space-y-8 pt-8 border-t border-border">
               {/* Big summary header */}
               <div className="text-center space-y-2">
