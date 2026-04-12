@@ -1,5 +1,11 @@
 import json
 import re
+import sys
+from pathlib import Path
+
+# Add project root to path for constants import
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import anthropic
 from config import ANTHROPIC_API_KEY
 from prompts import (
@@ -10,6 +16,12 @@ from prompts import (
     build_project_packet,
     root_cause_prompt,
 )
+from constants import (
+    LLM_MODEL_CHAT,
+    LLM_MODEL_ANALYSIS,
+    LLM_MAX_TOKENS_CHAT,
+    LLM_MAX_TOKENS_ANALYSIS,
+)
 
 
 def stream_chat(project: dict, question: str):
@@ -19,8 +31,8 @@ def stream_chat(project: dict, question: str):
     prompt = root_cause_prompt(context, question)
 
     with client.messages.stream(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
+        model=LLM_MODEL_CHAT,
+        max_tokens=LLM_MAX_TOKENS_CHAT,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
@@ -48,8 +60,8 @@ async def run_diagnosis(project_packet: dict) -> dict:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=DIAGNOSIS_SYSTEM_PROMPT,
         messages=[{
             "role": "user",
@@ -65,8 +77,8 @@ async def run_recommendations(diagnosis: dict, packet: dict) -> dict:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=RECOMMENDATION_SYSTEM_PROMPT,
         messages=[{
             "role": "user",
@@ -103,8 +115,8 @@ def run_diagnosis_sync(project_packet: dict) -> dict:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=DIAGNOSIS_SYSTEM_PROMPT,
         messages=[{
             "role": "user",
@@ -120,8 +132,8 @@ def run_recommendations_sync(diagnosis: dict, packet: dict) -> dict:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=RECOMMENDATION_SYSTEM_PROMPT,
         messages=[{
             "role": "user",
@@ -151,3 +163,53 @@ def analyze_project_sync(project: dict) -> dict:
     full_analysis = run_recommendations_sync(diagnosis, packet)
 
     return full_analysis
+
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# PORTFOLIO OPTIMIZATION (Agent 3)
+# ─────────────────────────────────────────────────────────────────────────────────
+
+# Load portfolio optimization prompt
+PORTFOLIO_PROMPT_PATH = Path(__file__).parent.parent / "pipeline" / "4_llm" / "portfolio_optimization_agent.md"
+
+def _load_portfolio_prompt() -> str:
+    """Load the portfolio optimization agent prompt"""
+    if PORTFOLIO_PROMPT_PATH.exists():
+        return PORTFOLIO_PROMPT_PATH.read_text()
+    return ""
+
+PORTFOLIO_OPTIMIZATION_PROMPT = _load_portfolio_prompt()
+
+
+def run_portfolio_optimization_sync(portfolio_input: dict) -> dict:
+    """Run portfolio optimization agent (sync version)"""
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    response = client.messages.create(
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=4000,  # Larger output for portfolio
+        system=PORTFOLIO_OPTIMIZATION_PROMPT,
+        messages=[{
+            "role": "user",
+            "content": f"Optimize this portfolio and return ONLY a JSON object:\n\n{json.dumps(portfolio_input, indent=2)}"
+        }]
+    )
+
+    return _extract_json_from_response(response.content[0].text)
+
+
+async def run_portfolio_optimization(portfolio_input: dict) -> dict:
+    """Run portfolio optimization agent (async version)"""
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    response = client.messages.create(
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=4000,
+        system=PORTFOLIO_OPTIMIZATION_PROMPT,
+        messages=[{
+            "role": "user",
+            "content": f"Optimize this portfolio and return ONLY a JSON object:\n\n{json.dumps(portfolio_input, indent=2)}"
+        }]
+    )
+
+    return _extract_json_from_response(response.content[0].text)

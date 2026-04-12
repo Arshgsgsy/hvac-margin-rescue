@@ -1,0 +1,349 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PortfolioOptimizationOutput",
+  "description": "Output from the Portfolio Optimization Agent - executive-ready action plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "executive_summary",
+    "prioritized_actions",
+    "this_week_plan",
+    "cash_flow_projection",
+    "confidence"
+  ],
+  "properties": {
+    "executive_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_theoretical_recovery",
+        "total_achievable_recovery",
+        "achievability_rate",
+        "key_insight_1",
+        "key_insight_2",
+        "key_insight_3"
+      ],
+      "properties": {
+        "total_theoretical_recovery": {
+          "type": "number",
+          "description": "Sum of all estimated_recovery_dollars across all actions"
+        },
+        "total_achievable_recovery": {
+          "type": "number",
+          "description": "Probability-weighted, resource-constrained realistic recovery"
+        },
+        "achievability_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "achievable / theoretical"
+        },
+        "key_insight_1": {
+          "type": "string",
+          "description": "Most important finding for CFO (1-2 sentences)"
+        },
+        "key_insight_2": {
+          "type": "string",
+          "description": "Second most important finding (1-2 sentences)"
+        },
+        "key_insight_3": {
+          "type": "string",
+          "description": "Third most important finding (1-2 sentences)"
+        }
+      }
+    },
+    "strategic_insights": {
+      "type": "array",
+      "description": "Cross-portfolio patterns and strategic recommendations",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "insight_type",
+          "title",
+          "description",
+          "recommendation"
+        ],
+        "properties": {
+          "insight_type": {
+            "type": "string",
+            "enum": [
+              "gc_concentration",
+              "systemic_pattern",
+              "resource_conflict",
+              "strategic_triage",
+              "dependency_chain",
+              "sector_pattern"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "Short title (5-10 words)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed explanation with numbers"
+          },
+          "affected_projects": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "financial_impact": {
+            "type": ["number", "null"],
+            "description": "Dollar impact of this insight"
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "Specific action to take"
+          }
+        }
+      }
+    },
+    "prioritized_actions": {
+      "type": "array",
+      "description": "All actions ranked globally across portfolio",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "global_rank",
+          "project_id",
+          "action",
+          "owner",
+          "estimated_recovery_dollars",
+          "expected_value"
+        ],
+        "properties": {
+          "global_rank": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1 = highest priority"
+          },
+          "action_id": {
+            "type": "string",
+            "description": "Reference back to input action"
+          },
+          "project_id": { "type": "string" },
+          "project_name": { "type": ["string", "null"] },
+          "action": { "type": "string" },
+          "owner": {
+            "type": "string",
+            "enum": ["Project Manager", "Finance", "Operations", "Executive"]
+          },
+          "estimated_recovery_dollars": { "type": ["number", "null"] },
+          "expected_value": {
+            "type": ["number", "null"],
+            "description": "estimated_recovery × confidence"
+          },
+          "cost_to_execute_hours": {
+            "type": ["number", "null"],
+            "description": "Estimated hours to execute"
+          },
+          "roi_score": {
+            "type": ["number", "null"],
+            "description": "expected_value / cost_to_execute_hours"
+          },
+          "urgency": {
+            "type": "string",
+            "enum": ["immediate", "this_week", "this_month", "ongoing"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "dependencies": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Action IDs that must complete first"
+          },
+          "conflicts_with": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Action IDs that conflict (same resource, same GC)"
+          },
+          "rationale": {
+            "type": ["string", "null"],
+            "description": "Why this ranking"
+          }
+        }
+      }
+    },
+    "this_week_plan": {
+      "type": "object",
+      "description": "Concrete plan for this week with resource allocation",
+      "additionalProperties": false,
+      "required": ["actions", "total_hours_by_owner"],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "string",
+                "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+              },
+              "project_id": { "type": "string" },
+              "action_summary": {
+                "type": "string",
+                "description": "Brief action description (under 80 chars)"
+              },
+              "owner": { "type": "string" },
+              "hours_required": { "type": "number" },
+              "expected_recovery": { "type": ["number", "null"] }
+            }
+          }
+        },
+        "total_hours_by_owner": {
+          "type": "object",
+          "properties": {
+            "Project Manager": { "type": "number" },
+            "Finance": { "type": "number" },
+            "Operations": { "type": "number" },
+            "Executive": { "type": "number" }
+          }
+        },
+        "resource_warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Warnings about capacity overload"
+        },
+        "total_expected_recovery_this_week": {
+          "type": ["number", "null"]
+        }
+      }
+    },
+    "cash_flow_projection": {
+      "type": "object",
+      "description": "Expected cash recovery by time horizon",
+      "additionalProperties": false,
+      "required": ["total_projected"],
+      "properties": {
+        "week_1": {
+          "type": ["number", "null"],
+          "description": "Cash expected this week"
+        },
+        "weeks_2_to_4": {
+          "type": ["number", "null"],
+          "description": "Cash expected in weeks 2-4"
+        },
+        "month_2": {
+          "type": ["number", "null"],
+          "description": "Cash expected in month 2"
+        },
+        "month_3": {
+          "type": ["number", "null"],
+          "description": "Cash expected in month 3"
+        },
+        "beyond_90_days": {
+          "type": ["number", "null"],
+          "description": "Cash expected after 90 days"
+        },
+        "total_projected": {
+          "type": "number",
+          "description": "Sum of all time horizons"
+        }
+      }
+    },
+    "gc_negotiation_bundles": {
+      "type": "array",
+      "description": "Recommended bundled negotiations by GC",
+      "items": {
+        "type": "object",
+        "properties": {
+          "gc_name": { "type": "string" },
+          "project_count": { "type": "integer" },
+          "total_pending_cos": { "type": ["number", "null"] },
+          "total_rejected_cos": { "type": ["number", "null"] },
+          "recommended_approach": { "type": "string" },
+          "estimated_recovery_if_bundled": { "type": ["number", "null"] },
+          "estimated_recovery_if_individual": { "type": ["number", "null"] },
+          "bundle_advantage": { "type": ["number", "null"] },
+          "projects": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "deprioritized_projects": {
+      "type": "array",
+      "description": "Projects recommended for minimal investment",
+      "items": {
+        "type": "object",
+        "properties": {
+          "project_id": { "type": "string" },
+          "project_name": { "type": ["string", "null"] },
+          "reason": { "type": "string" },
+          "theoretical_recovery": { "type": ["number", "null"] },
+          "achievable_recovery": { "type": ["number", "null"] },
+          "recommended_action": { "type": "string" },
+          "hours_saved": {
+            "type": ["number", "null"],
+            "description": "Hours freed up by deprioritizing"
+          },
+          "reallocate_to": {
+            "type": ["string", "null"],
+            "description": "Project ID to reallocate hours to"
+          }
+        }
+      }
+    },
+    "systemic_issues": {
+      "type": "array",
+      "description": "Portfolio-wide patterns requiring strategic response",
+      "items": {
+        "type": "object",
+        "properties": {
+          "issue": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["pricing", "estimating", "execution", "market", "vendor", "design"]
+          },
+          "affected_project_count": { "type": "integer" },
+          "total_impact_dollars": { "type": ["number", "null"] },
+          "is_recoverable": { "type": "boolean" },
+          "recoverable_portion": { "type": ["number", "null"] },
+          "recommendation": { "type": "string" }
+        }
+      }
+    },
+    "resource_reallocation": {
+      "type": "object",
+      "description": "Recommended resource shifts between projects",
+      "properties": {
+        "from_projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "project_id": { "type": "string" },
+              "hours_to_free": { "type": "number" },
+              "owner": { "type": "string" }
+            }
+          }
+        },
+        "to_projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "project_id": { "type": "string" },
+              "hours_to_add": { "type": "number" },
+              "owner": { "type": "string" },
+              "expected_incremental_recovery": { "type": ["number", "null"] }
+            }
+          }
+        },
+        "net_improvement": { "type": ["number", "null"] }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Overall confidence in this optimization"
+    }
+  }
+}

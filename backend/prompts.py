@@ -1,4 +1,18 @@
+import sys
 from pathlib import Path
+
+# Add project root to path for constants import
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from constants import (
+    RETENTION_RATE,
+    STAGE_COMPLETE_THRESHOLD,
+    STAGE_LATE_THRESHOLD,
+    STAGE_ACTIVE_THRESHOLD,
+    BILLING_NEARLY_COMPLETE_THRESHOLD,
+    BILLING_COMPLETE_THRESHOLD,
+    BILLING_GAP_RECOVERY_THRESHOLD,
+)
 
 # Prompt directory
 PROMPT_DIR = Path(__file__).parent.parent / "pipeline" / "4_llm"
@@ -31,11 +45,11 @@ def determine_stage(project: dict) -> str:
     """Determine project stage from billing percentage"""
     billing = project.get("billing_status", {})
     pct = billing.get("percent_billed", 0) or 0
-    if pct < 0.25:
+    if pct < STAGE_ACTIVE_THRESHOLD:
         return "early"
-    elif pct < 0.75:
+    elif pct < STAGE_LATE_THRESHOLD:
         return "active"
-    elif pct < 0.95:
+    elif pct < STAGE_COMPLETE_THRESHOLD:
         return "late"
     else:
         return "complete"
@@ -60,7 +74,7 @@ def build_project_packet(project: dict) -> dict:
     actual_cost_total = actual_labor + actual_material
     billing_gap_pct = pct_complete - pct_billed
     billed_to_date = contract_value * pct_billed if contract_value else 0
-    retention_held = billed_to_date * 0.10  # Standard 10% retention
+    retention_held = billed_to_date * RETENTION_RATE  # Standard retention
 
     # Calculate unbilled
     unbilled = billing_gap_pct * contract_value if billing_gap_pct > 0 else 0
@@ -131,8 +145,8 @@ def build_project_packet(project: dict) -> dict:
             "largest_variance_dollars": max(actual_labor - est_labor, actual_material - est_material),
             "labor_overrun_multiple": actual_labor / est_labor if est_labor > 0 else None,
             "material_overrun_multiple": actual_material / est_material if est_material > 0 else None,
-            "is_billing_nearly_complete": pct_billed >= 0.90,
-            "is_project_effectively_complete": pct_billed >= 0.95,
+            "is_billing_nearly_complete": pct_billed >= BILLING_NEARLY_COMPLETE_THRESHOLD,
+            "is_project_effectively_complete": pct_billed >= BILLING_COMPLETE_THRESHOLD,
             "recovery_paths_available": _determine_recovery_paths(project, pct_billed, billing_gap_pct)
         },
         "source_trace": {
@@ -171,16 +185,16 @@ def _summarize_cos(cos: list) -> str | None:
 def _determine_recovery_paths(project: dict, pct_billed: float, billing_gap: float) -> list[str]:
     """Determine which recovery paths are available"""
     paths = []
-    if billing_gap > 0.05:
+    if billing_gap > BILLING_GAP_RECOVERY_THRESHOLD:
         paths.append("billing_acceleration")
     cos = project.get("change_orders", [])
     if any(co.get("status", "").lower() == "pending" for co in cos):
         paths.append("pending_change_orders")
     if any(co.get("status", "").lower() == "rejected" for co in cos):
         paths.append("rejected_co_escalation")
-    if pct_billed < 0.95:
+    if pct_billed < BILLING_COMPLETE_THRESHOLD:
         paths.append("retention_release")
-    if pct_billed < 0.75:
+    if pct_billed < STAGE_LATE_THRESHOLD:
         paths.append("operational_efficiency")
     return paths
 

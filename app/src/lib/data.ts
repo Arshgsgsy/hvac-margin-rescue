@@ -1,4 +1,5 @@
 import { Project } from './types'
+import { PRIORITY_BILLING_WEIGHT, PRIORITY_OVERRUN_WEIGHT } from './constants'
 
 export function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(2)}M`
@@ -12,8 +13,8 @@ export function formatPercent(value: number): string {
 
 export function getPriorityScore(p: Project): number {
   const erosion = Math.abs(p.margin_delta) * 100
-  const billing = p.billing_gap * 100 * 0.6
-  const overrun = ((p.labor_overrun + p.material_overrun) / p.contract_value) * 100 * 0.4
+  const billing = p.billing_gap * 100 * PRIORITY_BILLING_WEIGHT
+  const overrun = ((p.labor_overrun + p.material_overrun) / p.contract_value) * 100 * PRIORITY_OVERRUN_WEIGHT
   return erosion + billing + overrun
 }
 

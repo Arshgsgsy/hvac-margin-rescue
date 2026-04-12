@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { SYSTEM_PROMPT, rootCausePrompt } from '@/prompts/root-cause'
+import { LLM_MODEL_CHAT, LLM_MAX_TOKENS_CHAT } from '@/lib/constants'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -14,8 +15,8 @@ export async function POST(req: NextRequest) {
   const prompt = rootCausePrompt(projectContext, question)
 
   const stream = await client.messages.stream({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
+    model: LLM_MODEL_CHAT,
+    max_tokens: LLM_MAX_TOKENS_CHAT,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: prompt }],
   })

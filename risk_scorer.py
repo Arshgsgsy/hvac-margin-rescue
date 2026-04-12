@@ -1,5 +1,19 @@
 import pandas as pd
 from pathlib import Path
+from constants import (
+    RISK_SCORE_HIGH_THRESHOLD,
+    RISK_SCORE_MEDIUM_THRESHOLD,
+    RISK_BILLING_Q10_SCORE,
+    RISK_BILLING_Q25_SCORE,
+    RISK_BILLING_Q50_SCORE,
+    RISK_MARGIN_Q10_SCORE,
+    RISK_MARGIN_Q25_SCORE,
+    RISK_MARGIN_Q50_SCORE,
+    RISK_CO_Q90_SCORE,
+    RISK_CO_Q75_SCORE,
+    RISK_RFI_Q90_SCORE,
+    RISK_RFI_Q75_SCORE,
+)
 
 
 def safe_quantile(series: pd.Series, q: float):
@@ -13,11 +27,11 @@ def score_billing_gap(x, q10, q25, q50):
     if pd.isna(x):
         return 0
     if q10 is not None and x <= q10:
-        return 40
+        return RISK_BILLING_Q10_SCORE
     if q25 is not None and x <= q25:
-        return 30
+        return RISK_BILLING_Q25_SCORE
     if q50 is not None and x <= q50:
-        return 15
+        return RISK_BILLING_Q50_SCORE
     return 0
 
 
@@ -25,11 +39,11 @@ def score_margin_pct(x, q10, q25, q50):
     if pd.isna(x):
         return 0
     if q10 is not None and x <= q10:
-        return 30
+        return RISK_MARGIN_Q10_SCORE
     if q25 is not None and x <= q25:
-        return 20
+        return RISK_MARGIN_Q25_SCORE
     if q50 is not None and x <= q50:
-        return 10
+        return RISK_MARGIN_Q50_SCORE
     return 0
 
 
@@ -37,9 +51,9 @@ def score_rejected_value_ratio(x, q75, q90):
     if pd.isna(x):
         return 0
     if q90 is not None and x >= q90:
-        return 20
+        return RISK_CO_Q90_SCORE
     if q75 is not None and x >= q75:
-        return 10
+        return RISK_CO_Q75_SCORE
     return 0
 
 
@@ -47,9 +61,9 @@ def score_total_rfis(x, q75, q90):
     if pd.isna(x):
         return 0
     if q90 is not None and x >= q90:
-        return 10
+        return RISK_RFI_Q90_SCORE
     if q75 is not None and x >= q75:
-        return 5
+        return RISK_RFI_Q75_SCORE
     return 0
 
 
@@ -70,9 +84,9 @@ def determine_main_issue(row):
 
 
 def determine_risk_level(score):
-    if score >= 70:
+    if score >= RISK_SCORE_HIGH_THRESHOLD:
         return "HIGH"
-    if score >= 40:
+    if score >= RISK_SCORE_MEDIUM_THRESHOLD:
         return "MEDIUM"
     return "LOW"
 

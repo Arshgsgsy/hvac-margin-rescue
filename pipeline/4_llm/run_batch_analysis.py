@@ -16,8 +16,25 @@ Processes all flagged projects through the 2-agent system:
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+# Paths
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from constants import (
+    RETENTION_RATE,
+    STAGE_COMPLETE_THRESHOLD,
+    STAGE_LATE_THRESHOLD,
+    STAGE_ACTIVE_THRESHOLD,
+    BILLING_NEARLY_COMPLETE_THRESHOLD,
+    BILLING_COMPLETE_THRESHOLD,
+    BILLING_GAP_RECOVERY_THRESHOLD,
+    LLM_MODEL_ANALYSIS,
+    LLM_MAX_TOKENS_ANALYSIS,
+)
 
 try:
     from anthropic import Anthropic
@@ -28,9 +45,6 @@ try:
     import jsonschema
 except ImportError:
     jsonschema = None
-
-# Paths
-PROJECT_ROOT = Path(__file__).parent.parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output_summaries"
 FLAGGED_PROJECTS = OUTPUT_DIR / "flagged_projects.json"
 ANALYSIS_OUTPUT = OUTPUT_DIR / "project_analyses.json"
@@ -58,11 +72,11 @@ def determine_stage(pct_billed: float | None) -> str:
     """Determine project stage from billing percentage"""
     if pct_billed is None:
         return "unknown"
-    if pct_billed < 0.25:
+    if pct_billed < STAGE_ACTIVE_THRESHOLD:
         return "early"
-    elif pct_billed < 0.75:
+    elif pct_billed < STAGE_LATE_THRESHOLD:
         return "active"
-    elif pct_billed < 0.95:
+    elif pct_billed < STAGE_COMPLETE_THRESHOLD:
         return "late"
     else:
         return "complete"
@@ -90,7 +104,7 @@ def build_project_packet(project: dict) -> dict:
 
     # Estimate retention (typically 10% of billed)
     billed_to_date = contract_value * pct_billed if contract_value else 0
-    retention_held = billed_to_date * 0.10  # Standard 10% retention
+    retention_held = billed_to_date * RETENTION_RATE  # Standard retention
 
     # Build packet conforming to project_packet.schema.json
     return {
@@ -155,8 +169,8 @@ def build_project_packet(project: dict) -> dict:
             "largest_variance_dollars": project.get("largest_variance_dollars"),
             "labor_overrun_multiple": actual_labor / est_labor if est_labor > 0 else None,
             "material_overrun_multiple": actual_material / est_material if est_material > 0 else None,
-            "is_billing_nearly_complete": pct_billed >= 0.90,
-            "is_project_effectively_complete": pct_billed >= 0.95,
+            "is_billing_nearly_complete": pct_billed >= BILLING_NEARLY_COMPLETE_THRESHOLD,
+            "is_project_effectively_complete": pct_billed >= BILLING_COMPLETE_THRESHOLD,
             "recovery_paths_available": _determine_recovery_paths(project, pct_billed, billing_gap_pct)
         },
         "source_trace": {
@@ -170,15 +184,15 @@ def build_project_packet(project: dict) -> dict:
 def _determine_recovery_paths(project: dict, pct_billed: float, billing_gap: float) -> list[str]:
     """Determine which recovery paths are available"""
     paths = []
-    if billing_gap > 0.05:
+    if billing_gap > BILLING_GAP_RECOVERY_THRESHOLD:
         paths.append("billing_acceleration")
     if project.get("co_pending_value", 0) > 0:
         paths.append("pending_change_orders")
     if project.get("co_rejected_value", 0) > 0:
         paths.append("rejected_co_escalation")
-    if pct_billed < 0.95:
+    if pct_billed < BILLING_COMPLETE_THRESHOLD:
         paths.append("retention_release")
-    if pct_billed < 0.75:
+    if pct_billed < STAGE_LATE_THRESHOLD:
         paths.append("operational_efficiency")
     return paths
 
@@ -206,8 +220,8 @@ def call_diagnosis_agent(packet: dict) -> dict:
     client = Anthropic()
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=DIAGNOSIS_PROMPT,
         messages=[{
             "role": "user",
@@ -226,8 +240,8 @@ def call_recommendation_agent(diagnosis: dict, packet: dict) -> dict:
     client = Anthropic()
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
+        model=LLM_MODEL_ANALYSIS,
+        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=RECOMMENDATION_PROMPT,
         messages=[{
             "role": "user",
@@ -406,10 +420,49 @@ def run_batch_analysis(dry_run: bool = False) -> list[dict]:
     return analyses
 
 
+def run_full_pipeline(dry_run: bool = False, skip_optimization: bool = False) -> tuple[list[dict], dict | None]:
+    """
+    Run complete 3-agent pipeline:
+    1. Diagnosis Agent (per project)
+    2. Recommendation Agent (per project)
+    3. Portfolio Optimization Agent (once, across all projects)
+
+    Args:
+        dry_run: If True, skip LLM calls
+        skip_optimization: If True, skip portfolio optimization step
+
+    Returns:
+        Tuple of (analyses, optimization)
+    """
+    # Stage 1 & 2: Per-project analysis
+    analyses = run_batch_analysis(dry_run=dry_run)
+
+    if dry_run or not analyses or skip_optimization:
+        return analyses, None
+
+    # Stage 3: Portfolio optimization
+    print("\n" + "=" * 60)
+    print("STAGE 3: PORTFOLIO OPTIMIZATION")
+    print("=" * 60)
+
+    from portfolio_optimizer import optimize_portfolio
+
+    flagged_projects = load_flagged_projects()
+    optimization = optimize_portfolio(analyses, flagged_projects)
+
+    return analyses, optimization
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run batch LLM analysis on flagged projects")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be analyzed without calling LLM")
+    parser.add_argument("--skip-optimization", action="store_true", help="Skip portfolio optimization step")
+    parser.add_argument("--optimization-only", action="store_true", help="Run only portfolio optimization on existing analyses")
     args = parser.parse_args()
 
-    run_batch_analysis(dry_run=args.dry_run)
+    if args.optimization_only:
+        from portfolio_optimizer import run_full_pipeline_with_optimization
+        run_full_pipeline_with_optimization(dry_run=args.dry_run)
+    else:
+        run_full_pipeline(dry_run=args.dry_run, skip_optimization=args.skip_optimization)

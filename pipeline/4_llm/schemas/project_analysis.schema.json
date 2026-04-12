@@ -164,9 +164,31 @@
             "type": "string",
             "enum": ["immediate", "this_week", "this_month", "ongoing"]
           },
+          "effort": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Effort level to execute this action"
+          },
+          "time_to_cash_days": {
+            "type": ["integer", "null"],
+            "description": "Estimated days until cash is recovered"
+          },
           "linked_root_cause": {
             "type": "string",
             "description": "Label from root_causes that this action addresses"
+          },
+          "cost_to_execute_hours": {
+            "type": ["number", "null"],
+            "description": "Estimated hours to execute (low=2, medium=8, high=24)"
+          },
+          "expected_value": {
+            "type": ["number", "null"],
+            "description": "Probability-weighted recovery: estimated_recovery × confidence"
+          },
+          "recovery_type": {
+            "type": ["string", "null"],
+            "enum": ["billing", "change_order", "retention", "operational", "claim", null],
+            "description": "Category of recovery for portfolio grouping"
           }
         }
       }
@@ -178,7 +200,50 @@
       "type": "string"
     },
     "total_recoverable_estimate": {
-      "type": ["number", "null"]
+      "type": ["number", "null"],
+      "description": "Sum of all estimated recovery dollars across actions"
+    },
+    "profit_impact": {
+      "type": "object",
+      "description": "Before/after margin comparison showing net improvement",
+      "additionalProperties": false,
+      "properties": {
+        "current_margin_dollars": {
+          "type": ["number", "null"],
+          "description": "Current margin in dollars (negative if loss)"
+        },
+        "projected_margin_dollars": {
+          "type": ["number", "null"],
+          "description": "Projected margin after recovery actions"
+        },
+        "net_improvement": {
+          "type": ["number", "null"],
+          "description": "Difference: projected - current (always show this)"
+        }
+      }
+    },
+    "recovery_by_timing": {
+      "type": "object",
+      "description": "Recovery amounts grouped by time horizon",
+      "additionalProperties": false,
+      "properties": {
+        "immediate": {
+          "type": ["number", "null"],
+          "description": "Recoverable this week"
+        },
+        "near_term": {
+          "type": ["number", "null"],
+          "description": "Recoverable this month"
+        },
+        "long_term": {
+          "type": ["number", "null"],
+          "description": "Retention, claims, disputed COs"
+        }
+      }
+    },
+    "break_even_recovery_needed": {
+      "type": ["number", "null"],
+      "description": "Amount needed to recover to reach 0% margin"
     },
     "recoverability_summary": {
       "type": "object",

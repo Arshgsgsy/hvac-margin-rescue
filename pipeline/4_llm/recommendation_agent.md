@@ -30,12 +30,25 @@ Extend the diagnosis with recovery actions. Return JSON:
       "financial_logic": "Why this recovers money",
       "estimated_recovery_dollars": number or null,
       "urgency": "immediate | this_week | this_month | ongoing",
+      "effort": "low | medium | high",
+      "time_to_cash_days": number or null,
       "linked_root_cause": "label from root_causes"
     }
   ],
   "forecast_if_no_action": "One sentence describing likely outcome",
   "forecast_with_action": "One sentence describing best-case outcome if actions taken",
   "total_recoverable_estimate": number,
+  "profit_impact": {
+    "current_margin_dollars": number,
+    "projected_margin_dollars": number,
+    "net_improvement": number
+  },
+  "recovery_by_timing": {
+    "immediate": number or null,
+    "near_term": number or null,
+    "long_term": number or null
+  },
+  "break_even_recovery_needed": number or null,
   "confidence": 0.0 to 1.0
 }
 ```
@@ -102,14 +115,25 @@ Order by:
 2. Lowest effort / fastest to execute
 3. Most certain outcome
 
-### Step 5: Calculate Totals
-- Sum `estimated_recovery_dollars` across all actions
-- This becomes `total_recoverable_estimate`
-- If sum is uncertain, provide a range in `forecast_with_action`
+### Step 5: Calculate Totals and Profit Impact
+- Sum `estimated_recovery_dollars` across all actions → `total_recoverable_estimate`
+- Calculate `profit_impact`:
+  - `current_margin_dollars` = contract_value × realized_margin_pct
+  - `projected_margin_dollars` = current_margin_dollars + total_recoverable_estimate
+  - `net_improvement` = projected - current (THE KEY NUMBER for the CFO)
+- Group recoveries by timing into `recovery_by_timing`:
+  - `immediate`: Actions with urgency=immediate
+  - `near_term`: Actions with urgency=this_week or this_month
+  - `long_term`: Retention release, disputed COs, claims
+- Calculate `break_even_recovery_needed` = abs(current_margin_dollars) if current < 0, else null
 
 ### Step 6: Write Forecasts
 **forecast_if_no_action**: What margin/loss will result if nothing changes
 **forecast_with_action**: What margin/recovery is achievable if actions are executed
+
+Always include the dollar improvement explicitly, e.g.:
+- "Without action, project closes at -$312K loss"
+- "With full execution, project recovers to +$47K profit (net improvement: $359K)"
 
 ## Action Quality Rules
 
@@ -120,6 +144,29 @@ Order by:
 5. **Linked**: Connect each action to a root cause from the diagnosis
 6. **No generic fluff**: "Investigate further" is not an action
 7. **Time-bound**: immediate, this_week, this_month, or ongoing
+8. **Effort-rated**: low (single email/call), medium (days of work), high (weeks of negotiation)
+9. **Time-to-cash**: Estimate days until the money is actually recovered
+10. **Cost-aware**: Estimate hours to execute (low=2h, medium=8h, high=24h)
+
+## Fields for Portfolio Optimization
+
+Include these additional fields to enable cross-project optimization:
+
+```json
+{
+  "recovery_actions": [
+    {
+      // ... existing fields ...
+      "cost_to_execute_hours": number,  // Estimated hours (2, 8, or 24)
+      "expected_value": number,         // estimated_recovery × confidence
+      "recovery_type": "billing | change_order | retention | operational | claim"
+    }
+  ]
+}
+```
+
+Calculate expected_value as: `estimated_recovery_dollars × confidence`
+Where confidence comes from the diagnosis (default 0.7 if not specified)
 
 ## Dollar Estimation Guidelines
 
@@ -139,25 +186,40 @@ If you cannot estimate, use null and explain in `financial_logic`.
   "recovery_actions": [
     {
       "priority": 1,
-      "action": "Submit catch-up billing for $234K unbilled approved work (SOV lines 3, 7, 12)",
+      "action": "Submit catch-up billing for unbilled approved work (SOV lines 3, 7, 12)",
       "owner": "Project Manager",
-      "financial_logic": "Work is 89% complete but only 78% billed. Gap = $234K in delayed cash.",
+      "financial_logic": "Work is 89% complete but only 78% billed. Gap represents delayed cash.",
       "estimated_recovery_dollars": 234000,
       "urgency": "immediate",
+      "effort": "low",
+      "time_to_cash_days": 14,
       "linked_root_cause": "Underbilling"
     },
     {
       "priority": 2,
-      "action": "Escalate rejected CO #47 ($156K) for owner-directed HVAC rerouting documented in field notes 2024-03-15",
+      "action": "Escalate rejected CO #47 for owner-directed HVAC rerouting documented in field notes",
       "owner": "Executive",
       "financial_logic": "Field notes confirm owner requested change; CO was rejected without stated reason. Re-submit with documentation.",
       "estimated_recovery_dollars": 156000,
       "urgency": "this_week",
+      "effort": "medium",
+      "time_to_cash_days": 45,
       "linked_root_cause": "Change Order Recovery Failure"
     }
   ],
-  "forecast_if_no_action": "Project will close at -12% margin with $390K unrecovered",
-  "forecast_with_action": "If CO #47 is approved and billing caught up, project can recover to +3% margin",
-  "total_recoverable_estimate": 390000
+  "forecast_if_no_action": "Project will close at -12% margin (calculated loss based on current data)",
+  "forecast_with_action": "With full execution, project can recover to +3% margin",
+  "total_recoverable_estimate": 390000,
+  "profit_impact": {
+    "current_margin_dollars": -312000,
+    "projected_margin_dollars": 78000,
+    "net_improvement": 390000
+  },
+  "recovery_by_timing": {
+    "immediate": 234000,
+    "near_term": 156000,
+    "long_term": 0
+  },
+  "break_even_recovery_needed": 312000
 }
 ```

@@ -1,7 +1,11 @@
 import duckdb
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from constants import OVERTIME_MULTIPLIER
 INPUT_FILE = ROOT / "hvac_data" / "labor_logs_all.csv"
 OUTPUT_DIR = ROOT / "output_summaries"
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -23,8 +27,8 @@ SELECT
     TRY_CAST(burden_multiplier AS DOUBLE) AS burden_multiplier,
     work_area,
     cost_code,
-    (TRY_CAST(hours_st AS DOUBLE) + TRY_CAST(hours_ot AS DOUBLE) * 1.5) AS effective_hours,
-    (TRY_CAST(hours_st AS DOUBLE) + TRY_CAST(hours_ot AS DOUBLE) * 1.5)
+    (TRY_CAST(hours_st AS DOUBLE) + TRY_CAST(hours_ot AS DOUBLE) * {OVERTIME_MULTIPLIER}) AS effective_hours,
+    (TRY_CAST(hours_st AS DOUBLE) + TRY_CAST(hours_ot AS DOUBLE) * {OVERTIME_MULTIPLIER})
         * TRY_CAST(hourly_rate AS DOUBLE)
         * TRY_CAST(burden_multiplier AS DOUBLE) AS labor_cost
 FROM read_csv_auto('{INPUT_FILE}', header=True)

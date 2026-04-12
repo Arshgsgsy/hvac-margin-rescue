@@ -23,14 +23,27 @@ import ast
 import csv
 import json
 import re
+import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
-
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from constants import (
+    OVERTIME_MULTIPLIER,
+    STAGE_COMPLETE_THRESHOLD,
+    STAGE_LATE_THRESHOLD,
+    STAGE_ACTIVE_THRESHOLD,
+    BILLING_GAP_RECOVERY_THRESHOLD,
+    DELIVERY_CLUSTERING_THRESHOLD,
+    FIELD_NOTE_CONTENT_LIMIT,
+    FIELD_NOTE_SUBJECT_LIMIT,
+    TOP_FIELD_NOTES_LIMIT,
+)
 DEFAULT_HVAC_DIR = ROOT / "hvac_data"
 DEFAULT_FLAGGED_FILE = ROOT / "pipeline" / "output" / "flagged_projects.json"
 DEFAULT_OUTPUT_DIR = ROOT / "pipeline" / "output" / "project_packets"
@@ -484,7 +497,7 @@ def compute_labor_actual(rows: list[dict[str, Any]]) -> float | None:
         burden_multiplier = num(row.get("burden_multiplier"))
         if hourly_rate is None or burden_multiplier is None:
             continue
-        total += (hours_st + hours_ot * 1.5) * hourly_rate * burden_multiplier
+        total += (hours_st + hours_ot * OVERTIME_MULTIPLIER) * hourly_rate * burden_multiplier
         seen = True
     return round(total, 2) if seen else None
 
@@ -686,7 +699,7 @@ def detect_delivery_clustering(rows: list[dict[str, Any]]) -> bool | None:
     if not counts_by_month:
         return None
     largest_month = counts_by_month.most_common(1)[0][1]
-    return largest_month / sum(counts_by_month.values()) >= 0.4
+    return largest_month / sum(counts_by_month.values()) >= DELIVERY_CLUSTERING_THRESHOLD
 
 
 def collect_schedule_signals(
@@ -725,11 +738,11 @@ def summarize_field_notes(rows: list[dict[str, Any]]) -> tuple[str | None, list[
     events: list[str] = []
 
     ranked_rows = sorted(rows, key=lambda row: score_note(str(row.get("content") or "")), reverse=True)
-    for row in ranked_rows[:6]:
+    for row in ranked_rows[:TOP_FIELD_NOTES_LIMIT]:
         content = squish(str(row.get("content") or ""))
         if not content:
             continue
-        snippet = truncate(content, 140)
+        snippet = truncate(content, FIELD_NOTE_CONTENT_LIMIT)
         if score_note(content) > 0:
             notable_notes.append(snippet)
         if any(keyword in content.lower() for keyword in ISSUE_KEYWORDS["owner_scope"]):
@@ -751,7 +764,7 @@ def summarize_rfis(rows: list[dict[str, Any]]) -> str | None:
         for row in rows
         if truthy(row.get("cost_impact")) or truthy(row.get("schedule_impact")) or (num(row.get("schedule_impact_days")) or 0) > 0
     )
-    top_subjects = [truncate(squish(str(row.get("subject") or "")), 80) for row in rows[:2] if row.get("subject")]
+    top_subjects = [truncate(squish(str(row.get("subject") or "")), FIELD_NOTE_SUBJECT_LIMIT) for row in rows[:2] if row.get("subject")]
     parts = [f"{len(rows)} RFIs total"]
     if open_count:
         parts.append(f"{open_count} still open")
@@ -800,19 +813,19 @@ def infer_project_stage(
     if completion_date and completion_date <= today:
         return "complete"
     if percent_complete is not None:
-        if percent_complete >= 95:
+        if percent_complete >= STAGE_COMPLETE_THRESHOLD * 100:
             return "complete"
-        if percent_complete >= 75:
+        if percent_complete >= STAGE_LATE_THRESHOLD * 100:
             return "late"
-        if percent_complete >= 15:
+        if percent_complete >= STAGE_ACTIVE_THRESHOLD * 100:
             return "active"
         return "early"
     if billing_complete_pct is not None:
-        if billing_complete_pct >= 95:
+        if billing_complete_pct >= STAGE_COMPLETE_THRESHOLD * 100:
             return "complete"
-        if billing_complete_pct >= 70:
+        if billing_complete_pct >= STAGE_LATE_THRESHOLD * 100:
             return "late"
-        if billing_complete_pct >= 15:
+        if billing_complete_pct >= STAGE_ACTIVE_THRESHOLD * 100:
             return "active"
         return "early"
     return "unknown"
@@ -827,7 +840,7 @@ def detect_recovery_paths(
     project_stage: str,
 ) -> list[str]:
     paths: list[str] = []
-    if billing_gap_pct is not None and billing_gap_pct > 5:
+    if billing_gap_pct is not None and billing_gap_pct > BILLING_GAP_RECOVERY_THRESHOLD * 100:
         paths.append("billing_acceleration")
     if approved_value and approved_value > 0:
         paths.append("approved_change_order_recovery")
