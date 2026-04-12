@@ -158,3 +158,18 @@ TOP_ACTIONS_LIMIT = 50                # Max actions to send to portfolio agent
 # ─────────────────────────────────────────────────────────────────────────────────
 PRIORITY_BILLING_WEIGHT = 0.6
 PRIORITY_OVERRUN_WEIGHT = 0.4
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# BATCH PARALLELIZATION CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────────────────
+BATCH_CONCURRENCY = 5              # Max projects processed in parallel
+MAX_CONCURRENT_API_CALLS = 10      # Max simultaneous API calls
+
+# Retry settings
+RETRY_MAX_ATTEMPTS = 3
+RETRY_BASE_DELAY = 1.0             # Base delay (seconds)
+RETRY_MAX_DELAY = 60.0             # Max delay between retries
+RETRY_JITTER = 0.1                 # 10% random jitter
+
+# Progress reporting
+PROGRESS_REPORT_INTERVAL = 5       # Report every N projects

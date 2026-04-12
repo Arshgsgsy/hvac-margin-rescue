@@ -24,6 +24,7 @@ from constants import (
     LLM_MAX_TOKENS_CHAT,
     LLM_MAX_TOKENS_ANALYSIS,
 )
+from async_llm_client import get_async_client, extract_json_from_response
 
 
 def _require_api_key():
@@ -67,11 +68,11 @@ def _extract_json_from_response(text: str) -> dict:
 
 
 async def run_diagnosis(project_packet: dict) -> dict:
-    """Run diagnosis agent on a project (async)"""
+    """Run diagnosis agent on a project (async, non-blocking)"""
     _require_api_key()
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = await get_async_client()
 
-    response = client.messages.create(
+    response = await client.create_message(
         model=LLM_MODEL_ANALYSIS,
         max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=DIAGNOSIS_SYSTEM_PROMPT,
@@ -81,15 +82,15 @@ async def run_diagnosis(project_packet: dict) -> dict:
         }]
     )
 
-    return _extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.content[0].text)
 
 
 async def run_recommendations(diagnosis: dict, packet: dict) -> dict:
-    """Run recommendation agent on diagnosis + packet (async)"""
+    """Run recommendation agent on diagnosis + packet (async, non-blocking)"""
     _require_api_key()
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = await get_async_client()
 
-    response = client.messages.create(
+    response = await client.create_message(
         model=LLM_MODEL_ANALYSIS,
         max_tokens=LLM_MAX_TOKENS_ANALYSIS,
         system=RECOMMENDATION_SYSTEM_PROMPT,
@@ -106,7 +107,7 @@ PROJECT PACKET:
         }]
     )
 
-    return _extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.content[0].text)
 
 
 async def analyze_project(project: dict) -> dict:
@@ -275,11 +276,11 @@ def run_portfolio_optimization_sync(portfolio_input: dict) -> dict:
 
 
 async def run_portfolio_optimization(portfolio_input: dict) -> dict:
-    """Run portfolio optimization agent (async version)"""
+    """Run portfolio optimization agent (async version, non-blocking)"""
     _require_api_key()
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = await get_async_client()
 
-    response = client.messages.create(
+    response = await client.create_message(
         model=LLM_MODEL_ANALYSIS,
         max_tokens=4000,
         system=PORTFOLIO_OPTIMIZATION_PROMPT,
@@ -289,4 +290,4 @@ async def run_portfolio_optimization(portfolio_input: dict) -> dict:
         }]
     )
 
-    return _extract_json_from_response(response.content[0].text)
+    return extract_json_from_response(response.content[0].text)

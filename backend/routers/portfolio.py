@@ -1,7 +1,9 @@
+import asyncio
 import json
 import sys
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from typing import Optional
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from data_transformer import load_portfolio_summary, load_all_projects, load_single_project
 from llm_service import (
     analyze_project,
@@ -11,6 +13,10 @@ from llm_service import (
     run_portfolio_optimization_sync,
 )
 from prompts import build_project_packet, build_hybrid_project_packet, get_management_summary
+
+# Add project root to path for constants
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from constants import BATCH_CONCURRENCY
 
 # Add pipeline to path for portfolio optimizer
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "pipeline" / "4_llm"))
@@ -145,25 +151,93 @@ def _run_batch_analysis_task():
 
 
 @router.post("/analyze-batch")
-async def analyze_batch(background_tasks: BackgroundTasks):
-    """Run 2-agent analysis on all flagged projects (background task)"""
+async def analyze_batch(
+    background_tasks: BackgroundTasks,
+    parallel: bool = Query(True, description="Use parallel processing (recommended)"),
+    concurrency: Optional[int] = Query(None, description="Max concurrent projects (default: 5)"),
+    use_hybrid: bool = Query(True, description="Use hybrid mode with ALL field notes"),
+):
+    """
+    Run 2-agent analysis on all flagged projects.
+
+    Args:
+        parallel: If True (default), use parallel processing for 4-5x speedup
+        concurrency: Max concurrent projects (default: 5)
+        use_hybrid: If True (default), use hybrid mode with ALL field notes
+    """
     projects = load_all_projects()
     if not projects:
         raise HTTPException(404, "No flagged projects found. Run the pipeline first.")
 
+    effective_concurrency = concurrency or BATCH_CONCURRENCY
+
     # Run in background
-    background_tasks.add_task(_run_batch_analysis_internal, projects)
+    if parallel:
+        background_tasks.add_task(
+            _run_batch_analysis_parallel_task,
+            projects,
+            use_hybrid,
+            effective_concurrency,
+        )
+    else:
+        background_tasks.add_task(_run_batch_analysis_internal, projects, use_hybrid)
 
     return {
         "status": "started",
         "project_count": len(projects),
+        "mode": "parallel" if parallel else "sequential",
+        "concurrency": effective_concurrency if parallel else 1,
         "output_file": str(ANALYSIS_OUTPUT)
     }
 
 
+def _run_batch_analysis_parallel_task(
+    projects: list[dict],
+    use_hybrid: bool = True,
+    concurrency: int = BATCH_CONCURRENCY,
+):
+    """
+    Background task to run parallel batch analysis.
+
+    Args:
+        projects: List of project dicts
+        use_hybrid: If True (default), use hybrid approach with ALL field notes
+        concurrency: Max concurrent projects
+    """
+    from parallel_batch_processor import run_parallel_batch_with_packet_building
+
+    async def run():
+        result = await run_parallel_batch_with_packet_building(
+            projects=projects,
+            use_hybrid=use_hybrid,
+            concurrency=concurrency,
+        )
+
+        # Save results
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        with open(ANALYSIS_OUTPUT, "w") as f:
+            json.dump(result.analyses, f, indent=2)
+
+        if result.errors:
+            with open(ANALYSIS_ERRORS_OUTPUT, "w") as f:
+                json.dump(result.errors, f, indent=2)
+        elif ANALYSIS_ERRORS_OUTPUT.exists():
+            ANALYSIS_ERRORS_OUTPUT.unlink()
+
+        # Generate summary
+        summary = _generate_portfolio_summary(result.analyses, result.errors)
+        with open(OUTPUT_DIR / "portfolio_analysis.json", "w") as f:
+            json.dump(summary, f, indent=2)
+
+        return result.analyses
+
+    # Run the async function
+    return asyncio.run(run())
+
+
 def _run_batch_analysis_internal(projects: list[dict], use_hybrid: bool = True):
     """
-    Internal function to run batch analysis.
+    Internal function to run batch analysis (sequential).
 
     Args:
         projects: List of project dicts

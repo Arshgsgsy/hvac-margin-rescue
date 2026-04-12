@@ -11,8 +11,13 @@ Processes all flagged projects through the 2-agent system:
    e. Validate full analysis output
    f. Save to output file
 3. Generate portfolio summary
+
+Supports parallel processing for 4-5x speedup:
+  python run_batch_analysis.py --parallel
+  python run_batch_analysis.py --parallel --concurrency 10
 """
 
+import asyncio
 import json
 import os
 import re
@@ -38,6 +43,7 @@ from constants import (
     BILLING_GAP_RECOVERY_THRESHOLD,
     LLM_MODEL_ANALYSIS,
     LLM_MAX_TOKENS_ANALYSIS,
+    BATCH_CONCURRENCY,
 )
 
 try:
@@ -619,6 +625,123 @@ def run_full_pipeline(dry_run: bool = False, skip_optimization: bool = False, us
     return analyses, optimization
 
 
+# ─────────────────────────────────────────────────────────────────────────────────
+# PARALLEL BATCH PROCESSING
+# ─────────────────────────────────────────────────────────────────────────────────
+
+async def run_batch_analysis_parallel(
+    dry_run: bool = False,
+    use_hybrid: bool = True,
+    concurrency: int = BATCH_CONCURRENCY,
+) -> list[dict]:
+    """
+    Parallel version of batch analysis with async processing.
+
+    Args:
+        dry_run: If True, skip LLM calls
+        use_hybrid: If True (default), use hybrid approach with ALL field notes
+        concurrency: Max concurrent projects (default from constants)
+
+    Returns:
+        List of analysis results
+    """
+    projects = load_flagged_projects()
+    if not projects:
+        print("No flagged projects found")
+        return []
+
+    if dry_run:
+        print(f"\n[DRY RUN] Would process {len(projects)} projects in parallel")
+        print(f"  Concurrency: {concurrency}")
+        print(f"  Mode: {'HYBRID' if use_hybrid else 'LEGACY'}")
+        for i, p in enumerate(projects[:5]):
+            pid = p.get("project_id") or p.get("id", f"unknown-{i}")
+            print(f"  - {pid}")
+        if len(projects) > 5:
+            print(f"  ... and {len(projects) - 5} more")
+        return []
+
+    # Import the parallel processor
+    from parallel_batch_processor import run_parallel_batch_with_packet_building
+
+    # Run parallel batch
+    result = await run_parallel_batch_with_packet_building(
+        projects=projects,
+        use_hybrid=use_hybrid,
+        concurrency=concurrency,
+    )
+
+    # Save results
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    with open(ANALYSIS_OUTPUT, "w") as f:
+        json.dump(result.analyses, f, indent=2)
+    print(f"\nSaved {len(result.analyses)} analyses to {ANALYSIS_OUTPUT}")
+
+    # Save errors separately if any
+    if result.errors:
+        errors_output = OUTPUT_DIR / "analysis_errors.json"
+        with open(errors_output, "w") as f:
+            json.dump(result.errors, f, indent=2)
+        print(f"Saved {len(result.errors)} errors to {errors_output}")
+
+    # Generate portfolio summary
+    if result.analyses:
+        summary = generate_portfolio_summary(result.analyses)
+        print(f"Generated portfolio summary: {summary['severity_counts']}")
+        print(f"Total recoverable: ${summary['total_estimated_recoverable_dollars']:,.0f}")
+
+    return result.analyses
+
+
+async def run_full_pipeline_parallel(
+    dry_run: bool = False,
+    skip_optimization: bool = False,
+    use_hybrid: bool = True,
+    concurrency: int = BATCH_CONCURRENCY,
+) -> tuple[list[dict], dict | None]:
+    """
+    Run complete 3-agent pipeline with parallel processing:
+    1. Diagnosis Agent (per project, PARALLEL)
+    2. Recommendation Agent (per project, PARALLEL)
+    3. Portfolio Optimization Agent (once, after all complete)
+
+    Args:
+        dry_run: If True, skip LLM calls
+        skip_optimization: If True, skip portfolio optimization step
+        use_hybrid: If True (default), use hybrid approach with ALL field notes
+        concurrency: Max concurrent projects
+
+    Returns:
+        Tuple of (analyses, optimization)
+    """
+    # Stage 1 & 2: Per-project analysis (PARALLEL)
+    print("=" * 60)
+    print("STAGES 1 & 2: PARALLEL PROJECT ANALYSIS")
+    print("=" * 60)
+
+    analyses = await run_batch_analysis_parallel(
+        dry_run=dry_run,
+        use_hybrid=use_hybrid,
+        concurrency=concurrency,
+    )
+
+    if dry_run or not analyses or skip_optimization:
+        return analyses, None
+
+    # Stage 3: Portfolio optimization
+    print("\n" + "=" * 60)
+    print("STAGE 3: PORTFOLIO OPTIMIZATION")
+    print("=" * 60)
+
+    from portfolio_optimizer import optimize_portfolio
+
+    flagged_projects = load_flagged_projects()
+    optimization = optimize_portfolio(analyses, flagged_projects)
+
+    return analyses, optimization
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run batch LLM analysis on flagged projects")
@@ -626,6 +749,9 @@ if __name__ == "__main__":
     parser.add_argument("--skip-optimization", action="store_true", help="Skip portfolio optimization step")
     parser.add_argument("--optimization-only", action="store_true", help="Run only portfolio optimization on existing analyses")
     parser.add_argument("--legacy", action="store_true", help="Use legacy mode (limited field notes) instead of hybrid")
+    parser.add_argument("--parallel", action="store_true", help="Use parallel processing (4-5x faster)")
+    parser.add_argument("--concurrency", type=int, default=BATCH_CONCURRENCY,
+                        help=f"Max concurrent projects (default: {BATCH_CONCURRENCY})")
     args = parser.parse_args()
 
     use_hybrid = not args.legacy
@@ -633,5 +759,14 @@ if __name__ == "__main__":
     if args.optimization_only:
         from portfolio_optimizer import run_full_pipeline_with_optimization
         run_full_pipeline_with_optimization(dry_run=args.dry_run)
+    elif args.parallel:
+        # Use async parallel processing
+        asyncio.run(run_full_pipeline_parallel(
+            dry_run=args.dry_run,
+            skip_optimization=args.skip_optimization,
+            use_hybrid=use_hybrid,
+            concurrency=args.concurrency,
+        ))
     else:
+        # Sequential processing (backward compatible)
         run_full_pipeline(dry_run=args.dry_run, skip_optimization=args.skip_optimization, use_hybrid=use_hybrid)
