@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProjectPacket",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "financials",
+    "billing",
+    "change_orders",
+    "operations",
+    "text_evidence",
+    "diagnostic_signals",
+    "source_trace"
+  ],
+  "properties": {
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "project_name", "project_stage"],
+      "properties": {
+        "project_id": { "type": "string" },
+        "project_name": { "type": "string" },
+        "project_stage": {
+          "type": "string",
+          "enum": ["early", "active", "late", "complete", "unknown"]
+        },
+        "region": { "type": ["string", "null"] },
+        "customer": { "type": ["string", "null"] },
+        "delivery_status": { "type": ["string", "null"] }
+      }
+    },
+    "financials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_value",
+        "estimated_cost_total",
+        "actual_cost_total",
+        "estimated_margin_dollars",
+        "estimated_margin_pct",
+        "realized_margin_dollars",
+        "realized_margin_pct",
+        "labor_estimated",
+        "labor_actual",
+        "material_estimated",
+        "material_actual",
+        "other_cost_estimated",
+        "other_cost_actual"
+      ],
+      "properties": {
+        "contract_value": { "type": ["number", "null"] },
+        "estimated_cost_total": { "type": ["number", "null"] },
+        "actual_cost_total": { "type": ["number", "null"] },
+        "estimated_margin_dollars": { "type": ["number", "null"] },
+        "estimated_margin_pct": { "type": ["number", "null"] },
+        "realized_margin_dollars": { "type": ["number", "null"] },
+        "realized_margin_pct": { "type": ["number", "null"] },
+        "labor_estimated": { "type": ["number", "null"] },
+        "labor_actual": { "type": ["number", "null"] },
+        "material_estimated": { "type": ["number", "null"] },
+        "material_actual": { "type": ["number", "null"] },
+        "other_cost_estimated": { "type": ["number", "null"] },
+        "other_cost_actual": { "type": ["number", "null"] }
+      }
+    },
+    "billing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "billed_to_date",
+        "billing_complete_pct",
+        "percent_complete",
+        "billing_gap_pct",
+        "retention_held",
+        "unbilled_approved_amount"
+      ],
+      "properties": {
+        "billed_to_date": { "type": ["number", "null"] },
+        "billing_complete_pct": { "type": ["number", "null"] },
+        "percent_complete": { "type": ["number", "null"] },
+        "billing_gap_pct": { "type": ["number", "null"] },
+        "retention_held": { "type": ["number", "null"] },
+        "unbilled_approved_amount": { "type": ["number", "null"] }
+      }
+    },
+    "change_orders": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approved_count",
+        "approved_value",
+        "pending_count",
+        "pending_value",
+        "rejected_count",
+        "rejected_value",
+        "missing_scope_signals"
+      ],
+      "properties": {
+        "approved_count": { "type": ["integer", "null"] },
+        "approved_value": { "type": ["number", "null"] },
+        "pending_count": { "type": ["integer", "null"] },
+        "pending_value": { "type": ["number", "null"] },
+        "rejected_count": { "type": ["integer", "null"] },
+        "rejected_value": { "type": ["number", "null"] },
+        "missing_scope_signals": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crew_size_peak",
+        "crew_size_expected",
+        "overtime_share",
+        "delivery_clustering_signal",
+        "top_cost_codes",
+        "top_sov_variances",
+        "schedule_pressure_signals"
+      ],
+      "properties": {
+        "crew_size_peak": { "type": ["number", "null"] },
+        "crew_size_expected": { "type": ["string", "null"] },
+        "overtime_share": { "type": ["number", "null"] },
+        "delivery_clustering_signal": { "type": ["boolean", "null"] },
+        "top_cost_codes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "top_sov_variances": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "schedule_pressure_signals": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "text_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_notes_summary",
+        "rfi_summary",
+        "change_order_summary",
+        "billing_notes_summary",
+        "notable_events"
+      ],
+      "properties": {
+        "field_notes_summary": { "type": ["string", "null"] },
+        "rfi_summary": { "type": ["string", "null"] },
+        "change_order_summary": { "type": ["string", "null"] },
+        "billing_notes_summary": { "type": ["string", "null"] },
+        "notable_events": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "diagnostic_signals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "largest_variance_bucket",
+        "largest_variance_dollars",
+        "labor_overrun_multiple",
+        "material_overrun_multiple",
+        "is_billing_nearly_complete",
+        "is_project_effectively_complete",
+        "recovery_paths_available"
+      ],
+      "properties": {
+        "largest_variance_bucket": { "type": ["string", "null"] },
+        "largest_variance_dollars": { "type": ["number", "null"] },
+        "labor_overrun_multiple": { "type": ["number", "null"] },
+        "material_overrun_multiple": { "type": ["number", "null"] },
+        "is_billing_nearly_complete": { "type": ["boolean", "null"] },
+        "is_project_effectively_complete": { "type": ["boolean", "null"] },
+        "recovery_paths_available": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "source_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tables_used", "row_counts", "field_mappings"],
+      "properties": {
+        "tables_used": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "row_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "field_mappings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
