@@ -20,8 +20,8 @@ cd "${ROOT_DIR}/backend"
 python3 -m uvicorn main:app --host 0.0.0.0 --port "${BACKEND_PORT:-8000}" &
 BACKEND_PID=$!
 
-cd "${ROOT_DIR}/app"
-node .next/standalone/server.js &
+cd "${ROOT_DIR}/app/.next/standalone"
+node server.js &
 FRONTEND_PID=$!
 
 set +e

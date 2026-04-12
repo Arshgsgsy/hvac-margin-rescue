@@ -36,7 +36,8 @@ RUN python3 -m venv "${VIRTUAL_ENV}" \
 COPY . .
 
 COPY --from=frontend-builder /workspace/app/.next/standalone ./app/.next/standalone
-COPY --from=frontend-builder /workspace/app/.next/static ./app/.next/static
+COPY --from=frontend-builder /workspace/app/.next/static ./app/.next/standalone/.next/static
+COPY --from=frontend-builder /workspace/app/public ./app/.next/standalone/public
 
 RUN chmod +x /workspace/start-combined.sh
 
