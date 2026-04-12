@@ -14,8 +14,6 @@ const EXPECTED_CSV_FILES = [
   "sov_budget_all.csv",
 ]
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -25,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
     }
 
-    const extractedFiles: { name: string; content: Blob }[] = []
+    const extractedFiles: { name: string; size: number }[] = []
 
     // Check if it's a ZIP file
     if (file.name.endsWith('.zip')) {
@@ -41,12 +39,12 @@ export async function POST(request: NextRequest) {
         
         if (baseName.endsWith('.csv')) {
           const content = await zipEntry.async('blob')
-          extractedFiles.push({ name: baseName, content })
+          extractedFiles.push({ name: baseName, size: content.size })
         }
       }
     } else if (file.name.endsWith('.csv')) {
       // Single CSV file
-      extractedFiles.push({ name: file.name, content: file })
+      extractedFiles.push({ name: file.name, size: file.size })
     } else {
       return NextResponse.json({ 
         error: 'Invalid file type. Please upload a ZIP file containing CSVs or individual CSV files.' 
@@ -56,46 +54,17 @@ export async function POST(request: NextRequest) {
     // Validate extracted files
     const extractedNames = extractedFiles.map(f => f.name)
     const missingFiles = EXPECTED_CSV_FILES.filter(f => !extractedNames.includes(f))
-    
-    if (missingFiles.length > 0 && extractedFiles.length > 0) {
-      // Allow partial uploads but warn
-      console.log(`[v0] Warning: Missing expected files: ${missingFiles.join(', ')}`)
-    }
-
-    // Try to forward files to backend
-    let backendResult = null
-    let backendConnected = false
-    
-    try {
-      const backendFormData = new FormData()
-      for (const { name, content } of extractedFiles) {
-        backendFormData.append('files', content, name)
-      }
-
-      const backendResponse = await fetch(`${BACKEND_URL}/upload`, {
-        method: 'POST',
-        body: backendFormData,
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      })
-
-      if (backendResponse.ok) {
-        backendResult = await backendResponse.json()
-        backendConnected = true
-      } else {
-        console.log('[v0] Backend upload failed, will use simulation mode')
-      }
-    } catch (error) {
-      console.log('[v0] Backend offline, will use simulation mode:', error)
-    }
+    const foundFiles = EXPECTED_CSV_FILES.filter(f => extractedNames.includes(f))
     
     return NextResponse.json({
       status: 'ok',
-      files: extractedFiles.map(f => f.name),
-      backendConnected,
-      backendResult,
-      message: backendConnected 
-        ? 'Files uploaded to backend successfully' 
-        : 'Files processed locally (backend offline - demo mode)',
+      files: extractedFiles,
+      expectedFiles: EXPECTED_CSV_FILES,
+      foundFiles,
+      missingFiles,
+      message: missingFiles.length === 0 
+        ? 'All expected files found! Ready to analyze.'
+        : `Found ${foundFiles.length}/${EXPECTED_CSV_FILES.length} expected files. Ready to analyze.`,
     })
 
   } catch (error) {
