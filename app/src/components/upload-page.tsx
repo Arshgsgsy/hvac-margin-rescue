@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle2, X, ArrowRight, Shield, BarChart3, Zap, FileSpreadsheet, Loader2, ChevronRight, AlertTriangle, TrendingDown, DollarSign, Building2, AlertCircle, Eye } from 'lucide-react'
+import { MOCK_PROJECTS, PORTFOLIO_SUMMARY, formatCurrency, formatPercent } from '@/lib/data'
+import { Project } from '@/lib/types'
+import { InvestigateModal } from './investigate-modal'
 
 interface UploadedFile {
   name: string
@@ -156,17 +159,14 @@ const STEPS: StepDef[] = [
 
 type StepStatus = 'idle' | 'running' | 'complete'
 
-interface UploadPageProps {
-  onComplete: () => void
-}
-
-export function UploadPage({ onComplete }: UploadPageProps) {
+export function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadComplete, setUploadComplete] = useState(false)
   const [pipelineStarted, setPipelineStarted] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const summaryRef = useRef<HTMLDivElement>(null)
 
   // Pipeline state
   const [statuses, setStatuses] = useState<StepStatus[]>(STEPS.map(() => 'idle'))
@@ -176,7 +176,19 @@ export function UploadPage({ onComplete }: UploadPageProps) {
   const logRefs = useRef<(HTMLDivElement | null)[]>([])
   const runningRef = useRef(false)
 
+  // Investigate modal
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+
   useEffect(() => { return () => { runningRef.current = false } }, [])
+
+  // Auto-scroll to summary when done
+  useEffect(() => {
+    if (done && summaryRef.current) {
+      setTimeout(() => {
+        summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 500)
+    }
+  }, [done])
 
   const runPipeline = async () => {
     if (running || done) return
@@ -208,7 +220,6 @@ export function UploadPage({ onComplete }: UploadPageProps) {
 
     setRunning(false)
     setDone(true)
-    setTimeout(onComplete, 1000)
   }
 
   const handleFiles = useCallback((fileList: FileList | null) => {
@@ -270,360 +281,493 @@ export function UploadPage({ onComplete }: UploadPageProps) {
 
   const completedCount = statuses.filter((s) => s === 'complete').length
 
-  // If pipeline started, show pipeline view
-  if (pipelineStarted) {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
-        {/* Header */}
-        <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm">
-          <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-foreground font-bold text-lg">MarginIQ</h1>
-                <p className="text-muted-foreground text-xs">Processing your data...</p>
-              </div>
-            </div>
-          </div>
-        </header>
+  // Group projects by severity
+  const criticalProjects = MOCK_PROJECTS.filter(p => p.severity === 'critical')
+  const warningProjects = MOCK_PROJECTS.filter(p => p.severity === 'warning')
+  const watchProjects = MOCK_PROJECTS.filter(p => p.severity === 'watch')
 
-        {/* Pipeline content */}
-        <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            <div>
-              <h2 className="text-foreground text-xl font-semibold">Analyzing Financial Data</h2>
-              <p className="text-sm mt-1 text-muted-foreground">
-                5-step data pipeline: clean data, load DuckDB, scan portfolio, export JSON, LLM analysis
-              </p>
-            </div>
+  // Calculate summary stats
+  const totalOverrun = MOCK_PROJECTS.reduce((sum, p) => sum + p.laborOverrun + p.materialOverrun, 0)
+  const totalRecovery = MOCK_PROJECTS.reduce((sum, p) => {
+    return sum + (p.recoveryActions?.reduce((s, a) => s + a.amount, 0) || 0)
+  }, 0)
+  const avgMarginErosion = MOCK_PROJECTS.reduce((sum, p) => sum + Math.abs(p.marginDelta), 0) / MOCK_PROJECTS.length
 
-            {/* Progress bar */}
-            {(running || done) && (
-              <div>
-                <div className="flex justify-between text-xs mb-1 text-muted-foreground">
-                  <span>Progress</span>
-                  <span>{completedCount} / {STEPS.length} steps</span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden bg-muted">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary-light)))',
-                      width: `${(completedCount / STEPS.length) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Steps - only running step shows logs, idle and complete are collapsed */}
-            <div className="space-y-2">
-              {STEPS.map((step, i) => {
-                const status = statuses[i]
-                const isRunning = status === 'running'
-                
-                return (
-                  <div
-                    key={step.id}
-                    className={`rounded-xl border overflow-hidden transition-all duration-300 ${status === 'idle' ? 'opacity-40' : ''}`}
-                    style={{
-                      borderColor: statusColor(status),
-                      background: status === 'complete' ? 'rgba(16,185,129,0.08)' : status === 'running' ? 'rgba(59,130,246,0.08)' : 'hsl(var(--card))',
-                    }}
-                  >
-                    {/* Collapsed view for idle and complete steps */}
-                    {!isRunning ? (
-                      <div className="flex items-center gap-3 px-4 py-3">
-                        <div 
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
-                          style={{ 
-                            background: status === 'complete' ? '#10b981' : 'hsl(var(--muted))',
-                            color: status === 'complete' ? '#fff' : 'hsl(var(--muted-foreground))'
-                          }}
-                        >
-                          {status === 'complete' ? (
-                            <CheckCircle2 className="w-4 h-4" />
-                          ) : (
-                            <span>{i + 1}</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-semibold ${status === 'complete' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                              {step.label}
-                            </span>
-                            <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
-                              {step.script}
-                            </code>
-                            {status === 'complete' && (
-                              <span className="text-xs text-emerald-500">done</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{step.description}</p>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    ) : (
-                      <>
-                        {/* Expanded view for running step only */}
-                        <div className="flex items-center gap-4 px-5 py-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                            style={{ background: '#3b82f6', color: '#fff' }}
-                          >
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <span className="font-semibold text-foreground">{step.label}</span>
-                              <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
-                                {step.script}
-                              </code>
-                              <span className="text-xs text-primary">running...</span>
-                            </div>
-                            <p className="text-xs mt-0.5 text-muted-foreground">{step.description}</p>
-                          </div>
-                        </div>
-
-                        {visibleLogs[i].length > 0 && (
-                          <div
-                            ref={(el) => { logRefs.current[i] = el }}
-                            className="border-t border-border/30 px-5 py-3 font-mono text-xs overflow-y-auto bg-card/50"
-                            style={{ maxHeight: '180px' }}
-                          >
-                            {visibleLogs[i].map((line, j) => (
-                              <div
-                                key={j}
-                                className="leading-relaxed"
-                                style={{
-                                  color: line.startsWith('[DONE]') ? '#10b981'
-                                    : line.includes('CRITICAL') ? '#ef4444'
-                                    : line.includes('WARNING') ? '#f59e0b'
-                                    : line.startsWith('---') ? 'hsl(var(--border))'
-                                    : line.startsWith('  ') ? 'hsl(var(--muted-foreground))'
-                                    : 'hsl(var(--muted-foreground))',
-                                }}
-                              >
-                                {line.startsWith('[DONE]') ? '' : '> '}{line}
-                              </div>
-                            ))}
-                            <span className="text-primary animate-pulse">|</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {done && (
-              <div className="rounded-xl p-4 border text-center bg-emerald-500/10 border-emerald-500/30">
-                <p className="text-sm font-semibold text-emerald-500">
-                  Pipeline complete. Loading dashboard...
-                </p>
-              </div>
-            )}
-          </div>
-        </main>
+  // Render project row
+  const renderProjectRow = (project: Project) => (
+    <div
+      key={project.id}
+      className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-card transition-colors"
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-semibold text-foreground truncate">{project.name}</span>
+          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{project.sector}</span>
+        </div>
+        <p className="text-sm text-muted-foreground line-clamp-1">{project.fieldNoteSummary}</p>
       </div>
-    )
-  }
+      <div className="text-right flex-shrink-0">
+        <div className="text-lg font-bold text-destructive">
+          -{formatPercent(Math.abs(project.marginDelta))}
+        </div>
+        <div className="text-xs text-muted-foreground">margin erosion</div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <div className="text-lg font-bold text-foreground">
+          {formatCurrency(project.laborOverrun + project.materialOverrun)}
+        </div>
+        <div className="text-xs text-muted-foreground">total overrun</div>
+      </div>
+      <button
+        onClick={() => setSelectedProject(project)}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex-shrink-0"
+      >
+        <Eye className="w-4 h-4" />
+        <span className="text-sm font-medium">Investigate</span>
+      </button>
+    </div>
+  )
 
-  // Upload view
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
               <BarChart3 className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h1 className="text-foreground font-bold text-lg">MarginIQ</h1>
-              <p className="text-muted-foreground text-xs">Financial Intelligence Platform</p>
+              <p className="text-muted-foreground text-xs">
+                {done ? 'Analysis Complete' : pipelineStarted ? 'Processing...' : 'Financial Intelligence Platform'}
+              </p>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-3xl">
-          {/* Title section */}
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold text-foreground mb-3">
-              Upload Your Financial Data
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-              Upload a ZIP file containing your company&apos;s financial records. Our AI will analyze margins, detect risks, and identify recovery opportunities.
-            </p>
-          </div>
-
-          {/* Upload zone */}
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onClick={() => inputRef.current?.click()}
-            className={`
-              relative rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer
-              transition-all duration-300
-              ${isDragging 
-                ? 'border-primary bg-primary/10 scale-[1.02]' 
-                : uploadComplete 
-                  ? 'border-emerald-500/50 bg-emerald-500/5' 
-                  : 'border-border hover:border-primary/50 hover:bg-muted/30'
-              }
-            `}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".zip,.csv,.xlsx,.json"
-              multiple
-              onChange={(e) => handleFiles(e.target.files)}
-              className="hidden"
-            />
-
-            {isUploading ? (
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center animate-pulse">
-                  <Upload className="w-8 h-8 text-primary" />
-                </div>
-                <p className="text-foreground font-semibold">Processing files...</p>
-                <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full bg-primary rounded-full animate-[loading_1.5s_ease-in-out_infinite]" style={{ width: '60%' }} />
-                </div>
+      <main className="p-6">
+        <div className="max-w-6xl mx-auto space-y-8">
+          
+          {/* Upload Section - always visible but minimized when pipeline is running */}
+          {!pipelineStarted && (
+            <div className="space-y-6">
+              {/* Title section */}
+              <div className="text-center">
+                <h2 className="text-3xl font-bold text-foreground mb-3">
+                  Upload Your Financial Data
+                </h2>
+                <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+                  Upload a ZIP file containing your company&apos;s financial records. Our AI will analyze margins, detect risks, and identify recovery opportunities.
+                </p>
               </div>
-            ) : uploadComplete && files.length > 0 ? (
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-foreground font-semibold text-lg">Files Ready</p>
-                  <p className="text-muted-foreground text-sm mt-1">
-                    {files.length} file{files.length > 1 ? 's' : ''} uploaded successfully
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
-                  <FileArchive className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-foreground font-semibold text-lg">
-                    Drop your ZIP file here
-                  </p>
-                  <p className="text-muted-foreground text-sm mt-1">
-                    or click to browse
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Supports: ZIP, CSV, XLSX, JSON</span>
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Uploaded files list */}
-          {files.length > 0 && (
-            <div className="mt-6 space-y-2">
-              {files.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl bg-card border border-border/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <FileArchive className="w-5 h-5 text-primary" />
-                    </div>
+              {/* Upload zone */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => inputRef.current?.click()}
+                className={`
+                  relative rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer
+                  transition-all duration-300 max-w-3xl mx-auto
+                  ${isDragging 
+                    ? 'border-primary bg-primary/10 scale-[1.02]' 
+                    : uploadComplete 
+                    ? 'border-emerald-500/50 bg-emerald-500/5' 
+                    : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                  }
+                `}
+              >
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".zip,.csv,.xlsx,.json"
+                  multiple
+                  onChange={(e) => handleFiles(e.target.files)}
+                  className="hidden"
+                />
+
+                {isUploading ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                    <p className="text-foreground font-medium">Uploading files...</p>
+                  </div>
+                ) : uploadComplete ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500" />
                     <div>
-                      <p className="text-foreground text-sm font-medium">{file.name}</p>
-                      <p className="text-muted-foreground text-xs">{formatFileSize(file.size)}</p>
+                      <p className="text-foreground font-medium">Files uploaded successfully</p>
+                      <p className="text-muted-foreground text-sm mt-1">Click to add more files or drag and drop</p>
                     </div>
                   </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                      <Upload className="w-8 h-8 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-foreground font-medium text-lg">
+                        Drop your files here, or <span className="text-primary">browse</span>
+                      </p>
+                      <p className="text-muted-foreground text-sm mt-2">
+                        Supports ZIP, CSV, XLSX, JSON
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Uploaded files list */}
+              {files.length > 0 && (
+                <div className="space-y-2 max-w-3xl mx-auto">
+                  {files.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card/50"
+                    >
+                      <FileArchive className="w-5 h-5 text-primary" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-foreground text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-muted-foreground text-xs">{formatFileSize(file.size)}</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeFile(index)
+                        }}
+                        className="p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Analyze button */}
+              {files.length > 0 && (
+                <div className="flex justify-center">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeFile(index)
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                    onClick={runPipeline}
+                    className="flex items-center gap-3 px-8 py-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-semibold text-lg shadow-lg shadow-primary/20"
                   >
-                    <X className="w-4 h-4 text-muted-foreground" />
+                    <Zap className="w-5 h-5" />
+                    Analyze Financial Data
+                    <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
-              ))}
+              )}
+
+              {/* Features */}
+              <div className="grid grid-cols-3 gap-4 max-w-3xl mx-auto pt-8">
+                <div className="text-center p-4">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-foreground font-medium text-sm">Margin Analysis</h3>
+                  <p className="text-muted-foreground text-xs mt-1">Identify erosion patterns</p>
+                </div>
+                <div className="text-center p-4">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <Shield className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-foreground font-medium text-sm">AI Root Cause</h3>
+                  <p className="text-muted-foreground text-xs mt-1">Claude-powered analysis</p>
+                </div>
+                <div className="text-center p-4">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <FileSpreadsheet className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-foreground font-medium text-sm">Recovery Actions</h3>
+                  <p className="text-muted-foreground text-xs mt-1">Prioritized recommendations</p>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Analyze button - runs pipeline automatically */}
-          <div className="mt-8 flex justify-center">
-            <button
-              onClick={runPipeline}
-              disabled={files.length === 0}
-              className={`
-                flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-semibold
-                transition-all duration-200
-                ${files.length > 0
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
-                }
-              `}
-            >
-              <Zap className="w-4 h-4" />
-              Analyze Financial Data
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Pipeline Section */}
+          {pipelineStarted && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-foreground text-xl font-semibold">Analyzing Financial Data</h2>
+                <p className="text-sm mt-1 text-muted-foreground">
+                  5-step data pipeline: clean, load, scan, export, analyze
+                </p>
+              </div>
 
-          {/* Features */}
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                icon: BarChart3,
-                title: 'Margin Analysis',
-                description: 'Identify margin erosion across your entire portfolio'
-              },
-              {
-                icon: Zap,
-                title: 'AI Root Cause',
-                description: 'Claude AI identifies why costs exceeded budgets'
-              },
-              {
-                icon: Shield,
-                title: 'Recovery Actions',
-                description: 'Get dollar-quantified recommendations to recover losses'
-              }
-            ].map((feature) => (
-              <div
-                key={feature.title}
-                className="flex items-start gap-3 p-4 rounded-xl bg-card/50 border border-border/30"
-              >
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <feature.icon className="w-4 h-4 text-primary" />
-                </div>
+              {/* Progress bar */}
+              {(running || done) && (
                 <div>
-                  <p className="text-foreground text-sm font-semibold">{feature.title}</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">{feature.description}</p>
+                  <div className="flex justify-between text-xs mb-1 text-muted-foreground">
+                    <span>Progress</span>
+                    <span>{completedCount} / {STEPS.length} steps</span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden bg-muted">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary-light)))',
+                        width: `${(completedCount / STEPS.length) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Steps - only running step shows logs, idle and complete are collapsed */}
+              <div className="space-y-2">
+                {STEPS.map((step, i) => {
+                  const status = statuses[i]
+                  const isRunning = status === 'running'
+                  
+                  return (
+                    <div
+                      key={step.id}
+                      className={`rounded-xl border overflow-hidden transition-all duration-300 ${status === 'idle' ? 'opacity-40' : ''}`}
+                      style={{
+                        borderColor: statusColor(status),
+                        background: status === 'complete' ? 'rgba(16,185,129,0.08)' : status === 'running' ? 'rgba(59,130,246,0.08)' : 'hsl(var(--card))',
+                      }}
+                    >
+                      {/* Collapsed view for idle and complete steps */}
+                      {!isRunning ? (
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <div 
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+                            style={{ 
+                              background: status === 'complete' ? '#10b981' : 'hsl(var(--muted))',
+                              color: status === 'complete' ? '#fff' : 'hsl(var(--muted-foreground))'
+                            }}
+                          >
+                            {status === 'complete' ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <span>{i + 1}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-semibold ${status === 'complete' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                {step.label}
+                              </span>
+                              <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
+                                {step.script}
+                              </code>
+                              {status === 'complete' && (
+                                <span className="text-xs text-emerald-500">done</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{step.description}</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                        </div>
+                      ) : (
+                        <>
+                          {/* Expanded view for running step only */}
+                          <div className="flex items-center gap-4 px-5 py-3">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                              style={{ background: '#3b82f6', color: '#fff' }}
+                            >
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="font-semibold text-foreground">{step.label}</span>
+                                <code className="text-xs px-2 py-0.5 rounded font-mono bg-muted text-muted-foreground">
+                                  {step.script}
+                                </code>
+                                <span className="text-xs text-primary">running...</span>
+                              </div>
+                              <p className="text-xs mt-0.5 text-muted-foreground">{step.description}</p>
+                            </div>
+                          </div>
+
+                          {visibleLogs[i].length > 0 && (
+                            <div
+                              ref={(el) => { logRefs.current[i] = el }}
+                              className="border-t border-border/30 px-5 py-3 font-mono text-xs overflow-y-auto bg-card/50"
+                              style={{ maxHeight: '180px' }}
+                            >
+                              {visibleLogs[i].map((line, j) => (
+                                <div
+                                  key={j}
+                                  className="leading-relaxed"
+                                  style={{
+                                    color: line.startsWith('[DONE]') ? '#10b981'
+                                      : line.includes('CRITICAL') ? '#ef4444'
+                                      : line.includes('WARNING') ? '#f59e0b'
+                                      : line.startsWith('---') ? 'hsl(var(--border))'
+                                      : line.startsWith('  ') ? 'hsl(var(--muted-foreground))'
+                                      : 'hsl(var(--muted-foreground))',
+                                  }}
+                                >
+                                  {line.startsWith('[DONE]') ? '' : '> '}{line}
+                                </div>
+                              ))}
+                              <span className="text-primary animate-pulse">|</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Executive Summary - shows after pipeline completes */}
+          {done && (
+            <div ref={summaryRef} className="space-y-8 pt-8 border-t border-border">
+              {/* Big summary header */}
+              <div className="text-center space-y-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  <span className="text-emerald-500 font-medium">Analysis Complete</span>
+                </div>
+                <h2 className="text-3xl font-bold text-foreground">Executive Summary</h2>
+                <p className="text-muted-foreground">Portfolio health overview for CFO review</p>
+              </div>
+
+              {/* Big metrics cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="rounded-2xl border border-border bg-card p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <Building2 className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="text-4xl font-bold text-foreground">{PORTFOLIO_SUMMARY.totalProjects}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Projects Analyzed</div>
+                </div>
+
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                    <AlertTriangle className="w-6 h-6 text-destructive" />
+                  </div>
+                  <div className="text-4xl font-bold text-destructive">{MOCK_PROJECTS.length}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Flagged Projects</div>
+                </div>
+
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
+                    <TrendingDown className="w-6 h-6 text-amber-500" />
+                  </div>
+                  <div className="text-4xl font-bold text-amber-500">{formatCurrency(totalOverrun)}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Total Overrun Exposure</div>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
+                    <DollarSign className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  <div className="text-4xl font-bold text-emerald-500">{formatCurrency(totalRecovery)}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Recoverable Amount</div>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Security note */}
-          <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Shield className="w-3.5 h-3.5" />
-            <span>Your data is processed securely and never stored permanently</span>
-          </div>
+              {/* Key findings */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <h3 className="font-semibold text-foreground mb-2">Portfolio Value</h3>
+                  <div className="text-2xl font-bold text-foreground">{formatCurrency(PORTFOLIO_SUMMARY.totalValue)}</div>
+                  <p className="text-sm text-muted-foreground mt-1">Total contract value under management</p>
+                </div>
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <h3 className="font-semibold text-foreground mb-2">Avg Margin Erosion</h3>
+                  <div className="text-2xl font-bold text-destructive">-{formatPercent(avgMarginErosion)}</div>
+                  <p className="text-sm text-muted-foreground mt-1">Average margin loss across flagged projects</p>
+                </div>
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <h3 className="font-semibold text-foreground mb-2">Critical Issues</h3>
+                  <div className="text-2xl font-bold text-destructive">{criticalProjects.length}</div>
+                  <p className="text-sm text-muted-foreground mt-1">Projects requiring immediate action</p>
+                </div>
+              </div>
+
+              {/* Biggest problem callout */}
+              <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-6 h-6 text-destructive" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground">Biggest Issue: {criticalProjects[0]?.name}</h3>
+                    <p className="text-muted-foreground mt-1">{criticalProjects[0]?.rootCause}</p>
+                    <div className="flex gap-4 mt-3">
+                      <div>
+                        <span className="text-sm text-muted-foreground">Margin Erosion: </span>
+                        <span className="font-bold text-destructive">-{formatPercent(Math.abs(criticalProjects[0]?.marginDelta || 0))}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-muted-foreground">Total Overrun: </span>
+                        <span className="font-bold text-foreground">{formatCurrency((criticalProjects[0]?.laborOverrun || 0) + (criticalProjects[0]?.materialOverrun || 0))}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Projects by severity */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-bold text-foreground">Projects by Severity</h3>
+
+                {/* Critical */}
+                {criticalProjects.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-destructive" />
+                      <h4 className="font-semibold text-destructive">Critical - Immediate Action Required</h4>
+                      <span className="text-sm text-muted-foreground">({criticalProjects.length} projects)</span>
+                    </div>
+                    <div className="space-y-2">
+                      {criticalProjects.map(renderProjectRow)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Elevated */}
+                {warningProjects.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-500" />
+                      <h4 className="font-semibold text-amber-500">Elevated - Attention This Week</h4>
+                      <span className="text-sm text-muted-foreground">({warningProjects.length} projects)</span>
+                    </div>
+                    <div className="space-y-2">
+                      {warningProjects.map(renderProjectRow)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Monitor */}
+                {watchProjects.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <h4 className="font-semibold text-blue-500">Monitor - Track for Changes</h4>
+                      <span className="text-sm text-muted-foreground">({watchProjects.length} projects)</span>
+                    </div>
+                    <div className="space-y-2">
+                      {watchProjects.map(renderProjectRow)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </main>
+
+      {/* Investigate Modal */}
+      {selectedProject && (
+        <InvestigateModal 
+          project={selectedProject} 
+          onClose={() => setSelectedProject(null)} 
+        />
+      )}
     </div>
   )
 }
