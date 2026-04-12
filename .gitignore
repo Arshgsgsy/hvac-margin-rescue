@@ -9,7 +9,7 @@ __pycache__/
 hvac_data/
 
 # CSV data files
-*.csv
+
 hvac_data.zip
 
 # Claude Code session data
