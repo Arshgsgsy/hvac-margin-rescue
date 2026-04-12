@@ -372,7 +372,7 @@ def call_portfolio_optimization_agent(portfolio_input: dict) -> dict:
 
     response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=LLM_MAX_TOKENS_PORTFOLIO,
+        max_completion_tokens=LLM_MAX_TOKENS_PORTFOLIO,
         messages=[
             {"role": "system", "content": prompt},
             {

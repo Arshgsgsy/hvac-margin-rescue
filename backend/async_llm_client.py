@@ -125,7 +125,7 @@ class AsyncLLMClient:
 
                 response = await self._client.chat.completions.create(
                     model=model,
-                    max_tokens=max_tokens,
+                    max_completion_tokens=max_tokens,
                     messages=full_messages,
                 )
 

@@ -43,7 +43,7 @@ def stream_chat(project: dict, question: str):
     try:
         stream = client.chat.completions.create(
             model=LLM_MODEL_CHAT,
-            max_tokens=LLM_MAX_TOKENS_CHAT,
+            max_completion_tokens=LLM_MAX_TOKENS_CHAT,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
@@ -136,7 +136,7 @@ def run_diagnosis_sync(project_packet: dict) -> dict:
 
     response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
+        max_completion_tokens=LLM_MAX_TOKENS_ANALYSIS,
         messages=[
             {"role": "system", "content": DIAGNOSIS_SYSTEM_PROMPT},
             {
@@ -156,7 +156,7 @@ def run_recommendations_sync(diagnosis: dict, packet: dict) -> dict:
 
     response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=LLM_MAX_TOKENS_ANALYSIS,
+        max_completion_tokens=LLM_MAX_TOKENS_ANALYSIS,
         messages=[
             {"role": "system", "content": RECOMMENDATION_SYSTEM_PROMPT},
             {
@@ -273,7 +273,7 @@ def run_portfolio_optimization_sync(portfolio_input: dict) -> dict:
 
     response = client.chat.completions.create(
         model=LLM_MODEL_ANALYSIS,
-        max_tokens=LLM_MAX_TOKENS_PORTFOLIO,
+        max_completion_tokens=LLM_MAX_TOKENS_PORTFOLIO,
         messages=[
             {"role": "system", "content": PORTFOLIO_OPTIMIZATION_PROMPT},
             {
