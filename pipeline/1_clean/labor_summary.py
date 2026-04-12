@@ -1,8 +1,9 @@
 import duckdb
 from pathlib import Path
 
-INPUT_FILE = "hvac_data/labor_logs_all.csv"
-OUTPUT_DIR = Path("output_summaries")
+ROOT = Path(__file__).resolve().parents[2]
+INPUT_FILE = ROOT / "hvac_data" / "labor_logs_all.csv"
+OUTPUT_DIR = ROOT / "output_summaries"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 con = duckdb.connect()
