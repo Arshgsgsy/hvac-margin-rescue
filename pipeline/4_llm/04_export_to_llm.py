@@ -13,7 +13,7 @@ project-level LLM analyst. It supports:
    into the same project packet contract.
 
 The output packets are written to `pipeline/output/project_packets/` and are the
-intended input for `pipeline/4_llm/project_agent.md`.
+intended input for the diagnosis and recommendation agents in `pipeline/4_llm/`.
 """
 
 from __future__ import annotations

@@ -15,9 +15,6 @@ hvac_data
 
 hvac_data.zip
 
-# Claude Code session data
-.claude/
-
 # Build scripts (dev only)
 app/build_*.ps1
 app/redesign*.ps1

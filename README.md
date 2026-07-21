@@ -1,277 +1,162 @@
-# The HVAC Margin Rescue Challenge
+# HVAC Margin Rescue
 
-DSC NYU Datathon | 🚀 3-Day Challenge | v0 Required — v0 credit promo code: **`DATATHON-V0`**
+A full-stack financial analytics platform for commercial HVAC contractors. It ingests raw project data (contracts, labor logs, billing, change orders, RFIs, field notes), detects margin erosion across the portfolio, explains why it is happening, and produces specific, dollar-quantified recovery actions.
 
----
+The system pairs a deterministic data pipeline (for the math) with a multi-agent LLM layer (for the reasoning), so aggregations stay fast and testable while the model only handles diagnosis and recommendations.
 
-## Submit on Devpost (required)
+## What it does
 
-**Your team must submit the hackathon entry through Devpost.** A GitHub repo or deployed app on its own is not an official submission — judges use what you upload and link on Devpost.
+- Scans the full project portfolio and computes margin health from over a million raw records
+- Flags at-risk projects using seven rule-based triggers and a percentile-based risk score
+- Diagnoses root causes per project (labor overrun, material blowout, underbilling, change-order failure, bad estimates, coordination friction) with supporting evidence
+- Generates prioritized recovery actions with an owner, urgency, estimated recovery dollars, and probability-weighted expected value
+- Optimizes actions across the whole portfolio: global ROI ranking, resource-constrained weekly plans, general-contractor negotiation bundles, cash flow projections, and systemic pattern detection
+- Serves everything through a dashboard with per-project drill-down and streaming project chat
 
-**→ Official submission page:** [NYU DSC × Pulse Foundry AI NYC — Margin Erosion in HVAC Companies](https://nyu-dsc-x-pulse-foundry-ai-nyc.devpost.com/)
-
-Register on that page, create your project, and submit all deliverables (demo video, repo URL, deployment link, v0 proof, technical summary, etc.) **through the Devpost submission form** before the deadline.
-
----
-
-## The Problem
-
-You're the CFO of a $50M/year commercial HVAC contractor.
-
-Last quarter's results:
-
-- **Bid margin:** 15.2%
-- **Realized margin:** 6.8%
-
-This wasn't bad luck. This is the pattern. By the time your PM realizes margin is gone, there's no runway to recover.
-
-**Your mission:** Build an AI agent using v0 that autonomously analyzes a portfolio of HVAC projects, detects margin erosion, explains root causes, and delivers specific recovery actions — without being asked.
-
----
-
-## The Dataset
-
-**405 commercial HVAC projects** | **$6.4B total portfolio** | **1.46M+ records**
-
-The dataset spans projects from 2018–2024 across Healthcare, Commercial Office, K-12 Education, Data Center, and Multifamily Residential sectors. Use the `*_all.csv` files — these are the working dataset.
-
-| File | Contents | Rows |
-| --- | --- | --- |
-| `contracts_all.csv` | Base contract info (project ID, value, GC, dates) | 405 |
-| `sov_all.csv` | Schedule of Values — 15 line items per project | 6,075 |
-| `sov_budget_all.csv` | Bid-time cost estimates per SOV line | 6,075 |
-| `labor_logs_all.csv` | Daily crew time entries with role, hours, rate | 1,202,039 |
-| `material_deliveries_all.csv` | Material receipts linked to SOV lines | 22,438 |
-| `billing_history_all.csv` | Pay application history | 6,479 |
-| `billing_line_items_all.csv` | Line-level billing detail per application | 90,112 |
-| `change_orders_all.csv` | Change orders (approved, pending, rejected) | 4,255 |
-| `rfis_all.csv` | Requests for information | 22,065 |
-| `field_notes_all.csv` | Unstructured daily field reports ⚠️ | 103,676 |
-
-**Synthetic Data:** [Google Drive](https://drive.google.com/drive/folders/1J9ERglvOk-0vGXZxKxMGO50YnAp_ov6i?usp=drive_link)
-
-### ⚠️ Data Quality Heads-Up
-
-This is real-world-style data — it is intentionally messy. Before querying, expect to handle:
-
-- **Role name inconsistencies** in `labor_logs_all.csv` — e.g. `"JM Pipefitter"`, `"Journeyman P.F."`, `"Pipefitter JM"` all refer to the same trade
-- **Mixed date formats** across files — some dates are `YYYY-MM-DD`, others are not
-
-There are additional data quality issues beyond these two. Finding and handling them is part of the challenge.
-
-**Your agent must reason through the noise — not after someone else cleans it up.**
-
-### Portfolio Composition
-
-The dataset covers 405 projects across six year cohorts. Your agent should analyze the full portfolio — the signal is somewhere in there.
-
-| Cohort | Projects | Years Active |
-| --- | --- | --- |
-| PRJ-2018-xxx | 80 | 2018–2020 |
-| PRJ-2019-xxx | 80 | 2019–2021 |
-| PRJ-2020-xxx | 80 | 2020–2022 |
-| PRJ-2021-xxx | 80 | 2021–2023 |
-| PRJ-2022-xxx | 60 | 2022–2024 |
-| PRJ-2023-xxx | 20 | 2023–2025 |
-| PRJ-2024-xxx | 5 | 2024–2026 |
-
-Project types span Healthcare, Commercial Office, K-12 Education, Data Center, and Multifamily Residential across contract values from ~$2M to ~$45M.
-
-**The portfolio contains projects with severe margin erosion — your agent should find them.**
-
----
-
-## What You're Building
-
-An **agentic system** — not a dashboard. The distinction matters:
-
-- A dashboard shows data when a human looks at it
-- An agent **acts**: it ingests the portfolio, reasons across tables, surfaces problems unprompted, and delivers specific recovery actions
-
-### Required Capabilities
-
-#### 1. Autonomous Portfolio Scan
-
-The agent independently ingests all project data, computes margin health across the portfolio, and flags at-risk projects without being prompted for each one.
-
-#### 2. Root Cause Reasoning
-
-For flagged projects, the agent drills into the data — cross-referencing labor logs, field notes, change orders, and billing — to explain *why* margin is eroding, not just *that* it is.
-
-#### 3. Proactive Recommendations
-
-The agent delivers specific, dollar-quantified actions: which change orders to submit, what to bill, where labor is bleeding, which field note signals indicate uncaptured scope. Generic "investigate further" outputs will score poorly.
-
-#### 4. Interface
-
-Use v0 to build a UI that surfaces agent outputs. The interface should feel like a CFO briefing, not a data table — executive-readable in 30 seconds, with the ability to drill down.
-
----
-
-## Evaluation (100 points)
-
-| Category | Points | Key Questions |
-| --- | --- | --- |
-| **Agent Quality** | 40 | Does it find the right projects? Correct margin math? Does it reason or just retrieve? |
-| **Recommendations** | 30 | Are actions specific and dollar-quantified? Would a CFO act on this? |
-| **Implementation** | 20 | Built with v0? Handles 1M+ records? Deployed and running? |
-| **Business Insight** | 10 | Does it explain WHY margin erodes? Does it forecast, not just report? |
-
----
-
-## Technical Requirements
-
-### 1. Deployment (Mandatory)
-
-- Agent must be **live and publicly accessible**
-- Core features must function at demo time
-- No localhost-only or slide-only demos
-
-Deploying on **Vercel** is **strongly encouraged**, but not required.
-
-If it's not deployed, it will not be judged.
-
----
-
-### 2. Required Use of v0
-
-**v0 credit:** Enter the promo code **`DATATHON-V0`** wherever v0 prompts for a code (e.g. billing, plan, or offer redemption) to apply datathon credit toward [v0](https://v0.app).
-
-All teams must meaningfully use **v0** in their development workflow.
-
-Approved workflows:
-
-#### Option A — Build in v0 Chat
-
-- Develop directly in v0 chat
-- Deploy through Vercel ([v0.app/docs/deployments](https://v0.app/docs/deployments))
-
-Proof required: live v0 project link
-
-#### Option B — v0 in IDE
-
-- Use v0 inside:
-  - Cursor ([v0.app/docs/cursor](https://v0.app/docs/cursor))
-  - Cline ([v0.app/docs/cline](https://v0.app/docs/cline))
-  - OpenAI Codex ([v0.app/docs/openai-codex](https://v0.app/docs/openai-codex))
-  - Zed ([v0.app/docs/zed](https://v0.app/docs/zed))
-- Deploy anywhere (**Vercel Strongly Encouraged**)
-
-Proof required: prompt history or chat logs from v0 integration
-
-#### Option C — Hybrid
-
-- Use v0 components and expand on it ([v0.app/templates/components](https://v0.app/templates/components))
-- Combine with your preferred stack
-
-Proof required: specific components or flows generated by v0, before/after iteration examples, explanation of how v0 influenced architecture or UX
-
----
-
-### 3. Proof of v0 Usage
-
-Teams must provide the required proof for the workflow option they choose. Submissions that fail to clearly demonstrate meaningful use of **v0** may be disqualified.
-
-### Key Formulas
+## Architecture
 
 ```
-Labor Cost = (hours_st + hours_ot × 1.5) × hourly_rate × burden_multiplier
-Variance = Actual Cost - Budget
-Billing Gap = % Complete - % Billed
-Budget Coverage = Estimated Budget / Contract Value
+CSV upload (10 files)
+        |
+        v
+Stage 1  Clean & summarize      pipeline/1_clean/   normalize roles, aggregate labor,
+        |                                           material, change orders, RFIs
+        v
+Stage 2  Load & join            pipeline/2_load/    actual-vs-budget merges, weekly labor,
+        |                                           billing and RFI enrichment
+        v
+Stage 3  Flag & score           pipeline/3_flag/ +  overspend/underbill measures, flagging
+        |                       root scripts        triggers, percentile risk scores
+        v
+Stage 4  Packet export          pipeline/4_llm/     one normalized JSON packet per
+        |                                           flagged project
+        v
+LLM agents                      backend/            diagnosis -> recommendation -> portfolio
+        |                                           optimization (OpenAI API)
+        v
+FastAPI backend  ->  Next.js dashboard
 ```
 
-### Working with 1M+ Records
+### The agent system
 
-The `labor_logs_all.csv` alone has 1.2M rows. Recommended approaches:
+| Agent | Prompt | Purpose |
+| --- | --- | --- |
+| Diagnosis | `pipeline/4_llm/diagnosis_agent.md` | Determines what is wrong and why: severity, root causes with evidence and confidence, recoverability assessment |
+| Recommendation | `pipeline/4_llm/recommendation_agent.md` | Turns a diagnosis into prioritized recovery actions with owners, urgency, dollar estimates, and expected value |
+| Portfolio optimization | `pipeline/4_llm/portfolio_optimization_agent.md` | Ranks actions globally across projects, fits them to team capacity, bundles GC negotiations, projects cash flow |
 
-- Pre-aggregate on the server (sum costs by `sov_line_id` and `project_id`) before passing to the agent
-- Use DuckDB, SQLite, or a simple aggregation step to reduce to ~6K summary rows
-- The LLM context window can't hold raw labor logs — aggregate first, then reason
+Agents 1 and 2 run per flagged project; agent 3 makes a single call over a compressed portfolio summary. Domain heuristics shared by the agents live in `pipeline/4_llm/financial_playbook.md`, and input/output shapes are defined by the JSON Schemas in `pipeline/4_llm/schemas/`. Models and token limits are configured in `constants.py` (OpenAI, `gpt-5.4-mini` by default).
 
-### Stack Suggestions
+## Input data
 
-v0 + Next.js + Shadcn/ui + Recharts + Claude/OpenAI API + DuckDB (for aggregation)
+Ten CSV files are expected. Three are required; the rest degrade gracefully if missing.
 
----
+| File | Contents | Required |
+| --- | --- | --- |
+| `contracts_all.csv` | Contract value, GC, dates per project | Yes |
+| `labor_logs_all.csv` | Daily crew time entries with role, hours, rate, burden | Yes |
+| `sov_budget_all.csv` | Bid-time cost estimates per SOV line | Yes |
+| `sov_all.csv` | Schedule of Values line items | No |
+| `material_deliveries_all.csv` | Material receipts linked to SOV lines | No |
+| `billing_history_all.csv` | Pay application history | No |
+| `billing_line_items_all.csv` | Line-level billing detail | No |
+| `change_orders_all.csv` | Change orders with status and amounts | No |
+| `rfis_all.csv` | Requests for information | No |
+| `field_notes_all.csv` | Unstructured daily field reports | No |
 
-## Time Management
+The pipeline is built for messy real-world data: labor role names are normalized through a role map, mixed date formats are coerced, and numeric fields are cleaned before aggregation.
 
-| Day | Recommended Focus |
+## Key formulas
+
+```
+labor_cost       = (hours_st + hours_ot * 1.5) * hourly_rate * burden_multiplier
+bid_margin       = (contract_value - estimated_cost) / contract_value
+realized_margin  = (contract_value - actual_cost) / contract_value
+billing_gap      = percent_complete - percent_billed
+budget_coverage  = estimated_budget / contract_value   (healthy: 88-110%)
+```
+
+### Flagging triggers
+
+A project is flagged when any of these fire: cost above adjusted contract (underwater), material overrun above 150%, labor overrun above 50%, rejected change-order exposure above 5% of contract on a low-margin project, budget coverage outside the 88-110% band, compound labor and material overrun, or unusually high cost-impact RFI counts or rates. Severity is assigned from realized margin (critical below -10%, warning below 0%, watch below 10%), and a 0-100 risk score is computed from billing, margin, change-order, and RFI percentiles. All thresholds live in `constants.py`.
+
+## API
+
+The FastAPI backend exposes:
+
+| Area | Endpoints |
 | --- | --- |
-| **Day 1** | Data ingestion, aggregation pipeline, agent scaffolding |
-| **Day 2** | Agent reasoning loops, root cause logic, recommendation engine |
-| **Day 3** | v0 UI, polish, deployment, demo prep |
+| Upload | `POST /upload`, `GET /upload/status`, `GET /upload/validate` |
+| Pipeline | `POST /pipeline/run`, `GET /pipeline/status`, `GET /pipeline/jobs/latest`, `GET /pipeline/jobs/{job_id}`, `POST /pipeline/run/scheduled` |
+| Portfolio | `GET /portfolio/summary`, `GET /portfolio/projects`, `GET /portfolio/analysis-summary` |
+| Analysis | `POST /analyze/{project_id}`, `GET /analyze/{project_id}/packet`, `POST /analyze-batch`, `GET /analyses`, `GET /analyses/{project_id}` |
+| Optimization | `POST /portfolio/optimize`, `GET /portfolio/optimization`, plus `/actions`, `/this-week`, `/cash-flow`, `/insights` sub-resources |
+| Projects | `GET /projects/{project_id}` |
+| Chat | `POST /chat` (streaming) |
+| Health | `GET /health` |
 
-**A working agent with one sharp insight beats a broken complex one.**
+Interactive docs are served at `/docs` when the backend is running.
 
----
+## Repository layout
 
-## What Good Output Looks Like
-
-A strong agent surfaces findings unprompted. Here is the kind of output that scores well:
-
-```text
-⚠️ CRITICAL — PRJ-2021-260 | Nashville Mixed-Income Housing
-Contract: $2,608,000 | Actual Cost: $4,991,000 | Realized Margin: -91%
-
-Root causes:
-  • Labor: $3,819K actual vs $807K estimated — 4.7× overrun. Crew ramped
-    to 12–18 workers/day through peak phase; estimate assumed 5–8.
-  • Material: $1,172K actual vs $355K estimated — 3.3× overrun.
-    Late-stage delivery clustering suggests expediting and substitutions.
-  • Billing is 99.4% complete — no recovery possible through billing alone.
-
-Recovery actions:
-  1. Audit 9 approved COs for unexecuted scope — if any work was performed
-     without documented contract relief, submit supplemental CO immediately.
-  2. Review field notes for references to owner-directed work outside
-     original scope (labor logs show 3 crew expansions with no CO trigger).
-  3. Engage GC on retention release: $259K held. Release accelerates
-     cash recovery on a completed project.
+```
+backend/            FastAPI app: routers, LLM services, pipeline orchestration
+pipeline/1_clean/   Stage 1: normalization and per-table summaries
+pipeline/2_load/    Stage 2: merges and aggregations
+pipeline/3_flag/    Stage 3: overspend and underbilling measures
+pipeline/4_llm/     Agent prompts, schemas, packet export, batch runners
+app/                Next.js dashboard (see app/README.md)
+constants.py        Centralized business rules, thresholds, and model config
+portfolio_scan.py   Portfolio health metrics (DuckDB aggregation)
+project_flagging.py Flagging trigger evaluation
+risk_scorer.py      Percentile-based risk scoring
+root_cause_summary.py  Deterministic root-cause summaries
 ```
 
-This is agent output. A table showing `-91%` with a red cell is a dashboard.
+Generated artifacts are written to `output_summaries/` and `pipeline/output/` (both gitignored), and uploaded datasets are managed under `.runtime/`.
 
----
+## Getting started
 
-## Don't Build
+Prerequisites: Python 3.11+, Node 20+, and an OpenAI API key.
 
-❌ A passive dashboard that waits for the user to ask questions
+### Backend
 
-❌ "Risk: High" outputs without specific recovery actions
+```bash
+pip install -r requirements.txt
+cp .env.example .env          # set OPENAI_API_KEY
+cd backend
+uvicorn main:app --reload --port 8000
+```
 
-❌ 15 chart types — focus the agent's output on what matters
+### Frontend
 
-❌ A perfect data cleaning pipeline before you start — build around the messiness
+```bash
+cd app
+npm install
+cp .env.local.example .env.local   # NEXT_PUBLIC_API_URL=http://localhost:8000
+npm run dev
+```
 
-❌ "Ask me anything" chat — the agent should push alerts, not wait for prompts
+Open http://localhost:3000, upload the CSV files, and run the pipeline from the UI. Alternatively trigger it over HTTP with `POST /pipeline/run`.
 
----
+### Batch analysis from the command line
 
-## Deliverables
+```bash
+python pipeline/4_llm/run_batch_analysis.py            # full agent run
+python pipeline/4_llm/run_batch_analysis.py --dry-run  # build inputs, no LLM calls
+python pipeline/4_llm/portfolio_optimizer.py           # portfolio optimization only
+```
 
-Provide the following **in your Devpost project submission** (see **Submit on Devpost (required)** at the top of this README):
+### Environment variables
 
-1. **Working agent** — GitHub repo or deployed URL (linked on Devpost)
-2. **Demo video** (3 min) — Show the agent autonomously finding problems and recommending actions
-3. **v0 proof** — Project link or prompt history
-4. **Technical summary** (1 page) — Architecture, agent design, AI approach, key decisions
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | `.env` | LLM access for analysis and chat |
+| `PIPELINE_SCHEDULE_MINUTES` | `.env` | Optional periodic pipeline re-runs |
+| `PIPELINE_SCHEDULE_TOKEN` | `.env` | Auth token for `POST /pipeline/run/scheduled` |
+| `CORS_ALLOW_ORIGINS` | `.env` | Comma-separated allowed origins |
+| `NEXT_PUBLIC_API_URL` | `app/.env.local` | Backend URL for the frontend |
 
----
+## Deployment
 
-## Domain Reference
-
-| Term | Meaning |
-| --- | --- |
-| **SOV** | Schedule of Values — contract breakdown by work type |
-| **Burden rate** | Labor overhead multiplier (taxes, insurance, benefits) |
-| **Earned value** | Budget × % complete |
-| **Retention** | Payment held until completion (typically 10%) |
-| **Budget coverage** | Estimated budget as % of contract value — healthy projects run 88–110% |
-
----
-
-Good luck. Time starts now. 🚀
-
----
+The root `Dockerfile` builds a single image that runs both services: the Next.js standalone build and the FastAPI backend behind it, supervised by `start-combined.sh`. `railway.toml` and `backend/railway.json` provide Railway configuration; the frontend can also be deployed on its own (for example on Vercel) with `NEXT_PUBLIC_API_URL` pointed at the backend.
